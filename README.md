@@ -2,4 +2,6 @@
 A Python based NES emulator attempt.
 
 #TODO
-[] Finish operations
+- [x] Finish operations
+- [ ] PPU, ROM, RAM, mappers
+- [ ] Check, if operations are working

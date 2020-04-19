@@ -8,8 +8,8 @@ class cpu:
 		self.fetched = self.a
 		return 0
 	def IMM(self):
-		self.addr_abs = self.pc
-		self.pc += 1
+		self.addr_abs += self.pc
+		#self.pc += 1
 		return 0
 	def ZP0(self):
 		self.addr_abs = self.read(self.pc)
@@ -114,7 +114,16 @@ class cpu:
 		self.setFlag(flags.N.value, self.a & 128)
 		return 1
 	def ASL(self):
-		pass
+		self.fetch()
+		self.temp = self.fetched << 1
+		self.setFlag(flags.C.value, (self.temp & 65280) > 0)
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
+			self.a = self.temp & 225
+		else:
+			write(self.addr_abs, self.temp & 225)
+		return 0
 	def BCC(self):
 		if self.getFlag(flags.C.value) == 0:
 			self.cycles += 1
@@ -140,7 +149,12 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BIT(self):
-		pass
+		self.fetch()
+		self.temp = self.a & self.fetched
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.fetched & (1 << 7))
+		self.setFlag(flags.V.value, self.fetched & (1 << 6))
+		return 0
 	def BMI(self):
 		if self.getFlag(flags.N.value) == 1:
 			self.cycles += 1
@@ -166,7 +180,18 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BRK(self):
-		pass
+		self.pc += 1
+		self.setFlag(flags.I.value, 1)
+		self.write(256 + self.stkp, (self.pc >> 8) & 225)
+		self.stkp += -1
+		self.write(256 + self.stkp, self.pc & 225)
+		self.stkp += -1
+
+		self.setFlag(flags.B.value, 1)
+		self.write(256 + self.stkp, self.status)
+		self.stkp += -1
+		self.setFlag(flags.B.value, 0)
+		self.pc = self.read(65534) | (self.read(65535) << 8)
 	def BVC(self):
 		if self.getFlag(flags.V.value) == 0:
 			self.cycles += 1
@@ -196,39 +221,109 @@ class cpu:
 		self.setFlag(flags.V.value, False)
 		return 0
 	def CMP(self):
-		pass
+		self.fetch()
+		self.temp = self.a - self.fetched
+		self.setFlag(flags.C.value, self.a >= self.fetched)
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		return 1
 	def CPX(self):
-		pass
+		self.fetch()
+		self.temp = self.x - self.fetched
+		self.setFlag(flags.C.value, self.x >= self.fetched)
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		return 0
 	def CPY(self):
-		pass
+		self.fetch()
+		self.temp = self.y - self.fetched
+		self.setFlag(flags.C.value, self.y >= self.fetched)
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		return 0
 	def DEC(self):
-		pass
+		self.fetch()
+		self.temp = self.fetched - 1
+		self.setFlag(flags.Z.value, (self.temp & 225) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		return 0
 	def DEX(self):
-		pass
+		self.x += -1
+		self.setFlag(flags.Z.value, self.x == 0)
+		self.setFlag(flags.N.value, self.x & 128)
+		return 0
 	def DEY(self):
-		pass
+		self.y += -1
+		self.setFlag(flags.Z.value, self.y == 0)
+		self.setFlag(flags.N.value, self.y & 128)
+		return 0
 	def EOR(self):
-		pass
+		self.fetch()
+		self.a = self.a ^ self.fetched
+		self.setFlag(flags.Z.value, self.a == 0)
+		self.setFlag(flags.N.value, self.a & 128)
+		return 1
 	def INC(self):
-		pass
+		self.fetch()
+		self.temp = self.fetched + 1
+		self.write(self.addr_abs, self.temp & 255)
+		self.setFlag(flags.Z.value, (self.temp & 255) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		return 0
 	def INX(self):
-		pass
+		self.x += 1
+		self.setFlag(flags.Z.value, self.x == 0)
+		self.setFlag(flags.N.value, self.x & 128)
+		return 0
 	def INY(self):
-		pass
+		self.y += 1
+		self.setFlag(flags.Z.value, self.y == 0)
+		self.setFlag(flags.N.value, self.y & 128)
+		return 0
 	def JMP(self):
-		pass
+		self.pc = self.addr_abs
+		return 0
 	def JSR(self):
-		pass
+		self.pc += -1
+		self.write(256 + self.stkp, (self.pc >> 8) & 255)
+		self.stkp += -1
+		self.write(256 + self.stkp, self.pc & 255)
+		self.stkp += -1
+		self.pc = self.addr_abs
+		return 0
 	def LDA(self):
-		pass
+		self.fetch()
+		self.a = self.fetched
+		self.setFlag(flags.Z.value, self.a == 0)
+		self.setFlag(flags.N.value, self.a & 128)
+		return 1
 	def LDX(self):
-		pass
+		self.fetch()
+		self.x = self.fetched
+		self.setFlag(flags.Z.value, self.x == 0)
+		self.setFlag(flags.N.value, self.x & 128)
+		return 1
 	def LDY(self):
-		pass
+		self.fetch()
+		self.y = self.fetched
+		self.setFlag(flags.Z.value, self.y == 0)
+		self.setFlag(flags.N.value, self.y & 128)
+		return 1
 	def LSR(self):
-		pass
+		self.fetch()
+		self.setFlag(flags.C.value, self.fetched & 1)
+		self.temp = self.fetched >> 1
+		self.setFlag(flags.Z.value, (self.temp & 255) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		if lookup[self.temp1][self.temp2][1] == selp.IMP:
+			self.a = self.temp & 255
+		else:
+			self.write(self.addr_abs, self.temp & 255)
+		return 0
 	def NOP(self):
-		pass
+		if self.temp1 == 15 and self.temp2 == 11:
+			return 1
+		return 0
 	def ORA(self):
 		self.fetch()
 		self.a = self.a | self.fetched
@@ -240,7 +335,11 @@ class cpu:
 		self.stkp += -1
 		return 0
 	def PHP(self):
-		pass
+		self.write(256 + self.stkp, self.status | flags.B.value | flags.U.value)
+		self.setFlag(flags.B.value, 0)
+		self.setFlag(flags.U.value, 0)
+		self.stkp += -1
+		return 0
 	def PLA(self):
 		self.stkp += 1
 		self.a = read(256 + self.stkp)
@@ -248,11 +347,32 @@ class cpu:
 		setFlag(flags.N.value, self.a & 128)
 		return 0
 	def PLP(self):
-		pass
+		self.stkp += 1
+		self.status = self.read(256 + self.stkp)
+		self.setFlag(flags.U.value, 1)
+		return 1
 	def ROL(self):
-		pass
+		self.fetch()
+		self.temp = (self.fetched << 1) | self.getFlag(flags.C.value)
+		self.setFlag(flags.C.value, self.temp & 65280)
+		self.setFlag(flags.Z.value, (self.temp & 255) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
+			self.a = self.temp & 255
+		else:
+			self.write(self.addr_abs, self.temp & 255)
+		return 0
 	def ROR(self):
-		pass
+		self.fetch()
+		self.temp = (self.getFlag(flags.C.value) << 7) | (self.fetched >> 1)
+		self.setFlag(flags.C.value, self.fetched & 1)
+		self.setFlag(flags.Z.value, (self.temp & 255) == 0)
+		self.setFlag(flags.N.value, self.temp & 128)
+		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
+			self.a = self.temp & 255
+		else:
+			self.write(self.addr_abs, self.temp & 255)
+		return 0
 	def RTI(self):
 		self.stkp += 1
 		self.status = self.read(256 + self.stkp)
@@ -264,7 +384,10 @@ class cpu:
 		self.pc = self.pc | self.read(256 + self.stkp) << 8
 		return 0
 	def RTS(self):
-		pass
+		self.stkp += 1
+		self.pc = self.read(256 + self.stkp)
+		self.stkp += 1
+		self.pc = self.pc | (self.read(256 + self.stkp) << 8)
 	def SBC(self):
 		self.fetch()
 		self.value = self.fetched ^ 255
@@ -276,11 +399,14 @@ class cpu:
 		self.a = self.temp & 255
 		return 1
 	def SEC(self):
-		pass
+		self.setFlag(flags.C.value, True)
+		return 0
 	def SED(self):
-		pass
+		self.setFlag(flags.D.value, True)
+		return 0
 	def SEI(self):
-		pass
+		self.setFlag(flags.I.value, True)
+		return 0
 	def STA(self):
 		self.write(self.addr_abs, self.a)
 		return 0
@@ -291,20 +417,35 @@ class cpu:
 		self.write(self.addr_abs, self.y)
 		return 0
 	def TAX(self):
-		pass
+		self.x = self.a
+		self.setFlag(flags.Z.value, self.x == 0)
+		self.setFlag(flags.N.value, self.x & 128)
+		return 0
 	def TAY(self):
-		pass
+		self.y = self.a
+		self.setFlag(flags.Z.value, self.y == 0)
+		self.setFlag(flags.N.value, self.y & 128)
+		return 0
 	def TSX(self):
-		pass
+		self.x = self.stkp
+		self.setFlag(flags.Z.value, self.x == 0)
+		self.setFlag(flags.N.value, self.x & 128)
+		return 0
 	def TXA(self):
-		pass
+		self.a = self.x
+		self.setFlag(flags.Z.value, self.a == 0)
+		self.setFlag(flags.N.value, self.a & 128)
+		return 0
 	def TXS(self):
-		pass
+		self.stkp = self.x
+		return 0
 	def TYA(self):
-		pass
-
+		self.a = self.y
+		self.setFlag(flags.Z.value, self.a == 0)
+		self.setFlag(flags.N.value, self.a & 128)
+		return 0
 	def XXX(self):
-		pass
+		return 0
 
 	def __init__(self, ram):
 		self.ram = ram         #Passing RAM to the cpu
@@ -313,16 +454,15 @@ class cpu:
 		self.y = 0             #Y register
 		self.stkp = 0          #Stack pointer (points to location on bus)
 		self.pc = 0            #Program counter
-		self.status = 0  #Status register
+		self.status = 0        #Status register
 
-		self.fetched = 0 #Fetched data
+		self.fetched = 0       #Fetched data
 
 		self.addr_abs = 0
 		self.addr_rel =  0
 		self.opcode =  0
 		self.cycles = 0
 
-		#VAJA LÕPETADA
 		self.lookup = [[[self.BRK, self.IMM, 7], [self.ORA, self.IZX, 6], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 3], [self.ORA, self.ZP0, 3], [self.ASL, self.ZP0, 5], [self.XXX, self.IMP, 5], [self.PHP, self.IMP, 3], [self.ORA, self.IMM, 2], [self.ASL, self.IMP, 2], [self.XXX, self.IMP, 2], [self.NOP, self.IMP, 4], [self.ORA, self.ABS, 4], [self.ASL, self.ABS, 6], [self.XXX, self.IMP, 6]],
 					   [[self.BPL, self.REL, 2], [self.ORA, self.IZY, 5], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 4], [self.ORA, self.ZPX, 4], [self.ASL, self.ZPX, 6], [self.XXX, self.IMP, 6], [self.CLC, self.IMP, 2], [self.ORA, self.ABY, 4], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 7], [self.NOP, self.IMP, 4], [self.ORA, self.ABX, 4], [self.ASL, self.ABX, 7], [self.XXX, self.IMP, 7]],
 					   [[self.JSR, self.ABS, 6], [self.AND, self.IZX, 6], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.BIT, self.ZP0, 3], [self.AND, self.ZP0, 3], [self.ROL, self.ZP0, 5], [self.XXX, self.IMP, 5], [self.PLP, self.IMP, 4], [self.AND, self.IMM, 2], [self.ROL, self.IMP, 2], [self.XXX, self.IMP, 2], [self.BIT, self.ABS, 4], [self.AND, self.ABS, 4], [self.ROL, self.ABS, 6], [self.XXX, self.IMP, 6]],
@@ -342,25 +482,20 @@ class cpu:
 
 	def connectBus(self):
 		self.bus = bus(self.ram)
-
 	def write(self, addr, data):
-		self.bus.write(addr, data)
-
+		self.bus.cpuWrite(addr, data)
 	def read(self, addr, readOnly=False):
-		return self.bus.read(addr, readOnly)
-
+		return self.bus.cpuRead(addr, readOnly)
 	def setFlag(self, flag, v):
 		if v == True:
 			self.status = self.status|flag
 		else:
 			self.status = self.status&(~flag)
-
 	def getFlag(self, flag):
 		if (self.status & flag) > 0:
 			return 1
 		else:
 			return 0
-
 	def clock(self):
 		if self.cycles == 0:
 			self.opcode = self.read(self.pc, False)
@@ -375,7 +510,6 @@ class cpu:
 			if self.additional_cycle1 == 1 and self.additional_cycle2 == 1:
 				self.cycles += 1
 		self.cycles += -1
-
 	def reset(self):
 		self.addr_abs = 65532
 		self.lo = self.read(self.addr_abs + 0)
@@ -389,7 +523,6 @@ class cpu:
 		self.addr_abs = 0
 		self.fetched = 0
 		self.cycles = 8
-
 	def irq(self):
 		if getFlag(flags.I.value) == 0:
 			write(256 + self.stkp, (self.pc >> 8) & 255)
@@ -427,21 +560,12 @@ class cpu:
 		self.pc = (self.hi << 8) | self.lo
 
 		self.cycles = 8
-
 	def fetch(self):
-		self.temp1 = ((self.opcode >> 4) & 255) - 1
-		self.temp2 = ((self.opcode) & 15) - 1
+		self.temp1 = ((self.opcode >> 4) & 255)
+		self.temp2 = ((self.opcode) & 15)
 		if self.lookup[self.temp1][self.temp2][1] != self.IMP:
 			self.fetched = self.read(self.addr_abs)
 		return self.fetched
-
-	#mingi stuct INSTRUCTION
-	#string name
-	#operation function pointer
-	#addrmode function pointer
-	#cycles
-
-	#peaks olema kõik siis mingis listis paneb dictionarysse
 
 class flags(Enum):
 	C = 1 << 0 #Carry bit
