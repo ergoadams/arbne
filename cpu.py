@@ -7,29 +7,31 @@ class cpu:
 		self.fetched = self.a
 		return 0
 	def IMM(self):
-		self.addr_abs += self.pc
+		self.addr_abs = self.pc
 		self.pc += 1
 		return 0
 	def ZP0(self):
 		self.addr_abs = self.read(self.pc)
 		self.pc += 1
-		self.addr_abs = self.addr_abs & 0xFF
+		self.addr_abs = self.addr_abs & 0x00FF
 		return 0
 	def ZPX(self):
-		self.addr_abs = self.read(self.pc + self.x)
+		self.addr_abs = self.read(self.pc)  + self.x
 		self.pc += 1
-		self.addr_abs = self.addr_abs & 0xFF
+		self.addr_abs = self.addr_abs & 0x00FF
 		return 0
 	def ZPY(self):
-		self.addr_abs = self.read(self.pc + self.y)
+		self.addr_abs = self.read(self.pc) + self.y
 		self.pc += 1
-		self.addr_abs = self.addr_abs & 0xFF
+		self.addr_abs = self.addr_abs & 0x00FF
 		return 0
 	def REL(self):
 		self.addr_rel = self.read(self.pc)
 		self.pc += 1
-		if self.addr_rel & 0x80:
-			self.addr_rel = self.addr_rel | 0xFF00
+		if self.addr_rel < 0x80:
+			pass
+		else:
+			self.addr_rel = self.addr_rel - 0x100
 		return 0
 	def ABS(self):
 		self.lo = self.read(self.pc)
@@ -70,7 +72,7 @@ class cpu:
 
 		self.ptr = (self.ptr_hi << 8) | self.ptr_lo
 
-		if self.ptr_lo == 0xFF:
+		if self.ptr_lo == 0x00FF:
 			self.addr_abs = (self.read(self.ptr & 0xFF00) << 8) | self.read(self.ptr + 0)
 		else:
 			self.addr_abs = (self.read(self.ptr + 1) << 8) | self.read(self.ptr + 0)
@@ -79,15 +81,15 @@ class cpu:
 	def IZX(self):
 		self.t = self.read(self.pc)
 		self.pc += 1
-		self.lo = self.read((self.t + self.x) & 0xFF)
-		self.hi = self.read((self.t + self.x + 1) & 0xFF)
+		self.lo = self.read((self.t + self.x) & 0x00FF)
+		self.hi = self.read((self.t + self.x + 1) & 0x00FF)
 		self.addr_abs = (self.hi << 8) | self.lo
 		return 0
 	def IZY(self):
-		self.t = self.read(self.pc, False)
+		self.t = self.read(self.pc)
 		self.pc += 1
-		self.lo = self.read(self.t & 0xFF, False)
-		self.hi = self.read((self.t + 1) & 0xFF, False)
+		self.lo = self.read(self.t & 0x00FF)
+		self.hi = self.read((self.t + 1) & 0x00FF)
 		self.addr_abs = (self.hi << 8) | self.lo
 		self.addr_abs += self.y
 
@@ -98,35 +100,35 @@ class cpu:
 
 	#Opcodes
 	def ADC(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.a + self.fetched + self.getFlag(flags.C.value)
-		self.setFlag(flags.C.value, self.temp > 0xFF)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
-		self.setFlag(flags.V.value, (~(self.a ^ self.fetched) & (self.a ^ self.temp)) & 0x80)
-		self.a = self.temp & 0xFF
+		self.setFlag(flags.C.value, self.temp > 255)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0)
+		self.setFlag(flags.V.value, ((~(self.a ^ self.fetched) & (self.a ^ self.temp)) & 0x0080) != 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x80) != 0x00)
+		self.a = self.temp & 0x00FF
 		return 1
 	def AND(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.a = self.a & self.fetched
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 1
 	def ASL(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.fetched << 1
-		self.setFlag(flags.C.value, (self.temp & 0xFF00) > 0x00)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.C.value, (self.temp & 0xFF00) > 0)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x80) != 0x00)
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
 		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
-			self.a = self.temp & 0xFF
+			self.a = self.temp & 0x00FF
 		else:
-			write(self.addr_abs, self.temp & 0xFF)
+			self.write(self.addr_abs, self.temp & 0x00FF)
 		return 0
 	def BCC(self):
-		if self.getFlag(flags.C.value) == 0x00:
+		if self.getFlag(flags.C.value) == 0:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -134,7 +136,7 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BCS(self):
-		if self.getFlag(flags.C.value) == 0x01:
+		if self.getFlag(flags.C.value) == 1:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -142,7 +144,7 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BEQ(self):
-		if self.getFlag(flags.Z.value) == 0x01:
+		if self.getFlag(flags.Z.value) == 1:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -150,14 +152,14 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BIT(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.a & self.fetched
 		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.fetched & (1 << 7))
-		self.setFlag(flags.V.value, self.fetched & (1 << 6))
+		self.setFlag(flags.N.value, self.fetched & (1 << 7) != 0x00)
+		self.setFlag(flags.V.value, self.fetched & (1 << 6) != 0x00)
 		return 0
 	def BMI(self):
-		if self.getFlag(flags.N.value) == 0x01:
+		if self.getFlag(flags.N.value) == 1:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -165,7 +167,7 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BNE(self):
-		if self.getFlag(flags.Z.value) == 0x00:
+		if self.getFlag(flags.Z.value) == 0:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -173,7 +175,7 @@ class cpu:
 			self.pc = self.addr_abs
 		return 0
 	def BPL(self):
-		if self.getFlag(flags.N.value) == 0x00:
+		if self.getFlag(flags.N.value) == 0:
 			self.cycles += 1
 			self.addr_abs = self.pc + self.addr_rel
 			if (self.addr_abs & 0xFF00) != (self.pc & 0xFF00):
@@ -182,16 +184,16 @@ class cpu:
 		return 0
 	def BRK(self):
 		self.pc += 1
-		self.setFlag(flags.I.value, 1)
-		self.write(0x0100 + self.stkp, (self.pc >> 8) & 0xFF)
+		self.setFlag(flags.I.value, True)
+		self.write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
 		self.stkp += -1
-		self.write(0x0100 + self.stkp, self.pc & 0xFF)
+		self.write(0x0100 + self.stkp, self.pc & 0x00FF)
 		self.stkp += -1
 
-		self.setFlag(flags.B.value, 1)
+		self.setFlag(flags.B.value, True)
 		self.write(0x0100 + self.stkp, self.status)
 		self.stkp += -1
-		self.setFlag(flags.B.value, 0)
+		self.setFlag(flags.B.value, False)
 		self.pc = self.read(0xFFFE) | (self.read(0xFFFF) << 8)
 	def BVC(self):
 		if self.getFlag(flags.V.value) == 0:
@@ -222,190 +224,205 @@ class cpu:
 		self.setFlag(flags.V.value, False)
 		return 0
 	def CMP(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.a - self.fetched
 		self.setFlag(flags.C.value, self.a >= self.fetched)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 1
 	def CPX(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.x - self.fetched
 		self.setFlag(flags.C.value, self.x >= self.fetched)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x0000)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 0
 	def CPY(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.y - self.fetched
 		self.setFlag(flags.C.value, self.y >= self.fetched)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 0
 	def DEC(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = self.fetched - 1
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x0000)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 0
 	def DEX(self):
-		self.x += -1
+		self.x = (self.x - 1) & 0xFF
 		self.setFlag(flags.Z.value, self.x == 0x00)
-		self.setFlag(flags.N.value, self.x & 0x80)
+		self.setFlag(flags.N.value, (self.x & 0x80) != 0x00)
 		return 0
 	def DEY(self):
-		self.y += -1
+		self.y = (self.y - 1) & 0xFF
 		self.setFlag(flags.Z.value, self.y == 0x00)
-		self.setFlag(flags.N.value, self.y & 0x80)
+		self.setFlag(flags.N.value, (self.y & 0x80) != 0x00)
 		return 0
 	def EOR(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.a = self.a ^ self.fetched
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 1
 	def INC(self):
-		self.fetch()
-		self.temp = self.fetched + 1
-		self.write(self.addr_abs, self.temp & 0xFF)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.fetched = self.fetch()
+		self.temp = (self.fetched + 1) & 0xFF
+		self.write(self.addr_abs, self.temp)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x0000)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 0
 	def INX(self):
-		self.x += 1
+		self.x = (self.x + 1) & 0xFF
 		self.setFlag(flags.Z.value, self.x == 0x00)
-		self.setFlag(flags.N.value, self.x & 0x80)
+		self.setFlag(flags.N.value, (self.x & 0x80) != 0x00)
 		return 0
 	def INY(self):
-		self.y += 1
+		self.y = (self.y + 1) & 0xFF
 		self.setFlag(flags.Z.value, self.y == 0x00)
-		self.setFlag(flags.N.value, self.y & 0x80)
+		self.setFlag(flags.N.value, (self.y & 0x80) != 0x00)
 		return 0
 	def JMP(self):
 		self.pc = self.addr_abs
 		return 0
 	def JSR(self):
 		self.pc += -1
-		self.write(0x0100 + self.stkp, (self.pc >> 8) & 0xFF)
+		self.write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
 		self.stkp += -1
-		self.write(0x0100 + self.stkp, self.pc & 0xFF)
+		self.write(0x0100 + self.stkp, self.pc & 0x00FF)
 		self.stkp += -1
 		self.pc = self.addr_abs
 		return 0
 	def LDA(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.a = self.fetched
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 1
 	def LDX(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.x = self.fetched
 		self.setFlag(flags.Z.value, self.x == 0x00)
-		self.setFlag(flags.N.value, self.x & 0x80)
+		self.setFlag(flags.N.value, (self.x & 0x80) != 0x00)
 		return 1
 	def LDY(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.y = self.fetched
 		self.setFlag(flags.Z.value, self.y == 0)
-		self.setFlag(flags.N.value, self.y & 0x80)
+		self.setFlag(flags.N.value, (self.y & 0x80) != 0x00)
 		return 1
 	def LSR(self):
-		self.fetch()
-		self.setFlag(flags.C.value, self.fetched & 1)
+		self.fetched = self.fetch()
+		self.setFlag(flags.C.value, (self.fetched & 0x0001) == 0x0001)
 		self.temp = self.fetched >> 1
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x0000)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
-		if lookup[self.temp1][self.temp2][1] == selp.IMP:
-			self.a = self.temp & 0xFF
+		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
+			self.a = self.temp & 0x00FF
+			if self.a < 0:
+				self.a = 255
+			if self.a > 255:
+				self.a = 0
 		else:
-			self.write(self.addr_abs, self.temp & 0xFF)
+			self.write(self.addr_abs, self.temp & 0x00FF)
 		return 0
 	def NOP(self):
-		self.temp1 = ((self.opcode >> 4) & 0xFF)
-		self.temp2 = ((self.opcode) & 0x0F)
-		if self.temp1 == 15 and self.temp2 == 11:
+		if self.opcode == 0x1C:
+			pass
+		elif self.opcode == 0x3C:
+			pass
+		elif self.opcode == 0x5C:
+			pass
+		elif self.opcode == 0x7C:
+			pass
+		elif self.opcode == 0xDC:
+			pass
+		elif self.opcode == 0xFC:
 			return 1
+
 		return 0
 	def ORA(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.a = self.a | self.fetched
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 1
 	def PHA(self):
-		write(0x0100 + self.stkp, self.a)
+		self.write(0x0100 + self.stkp, self.a)
 		self.stkp += -1
 		return 0
 	def PHP(self):
 		self.write(0x0100 + self.stkp, self.status | flags.B.value | flags.U.value)
-		self.setFlag(flags.B.value, 0)
-		self.setFlag(flags.U.value, 0)
+		self.setFlag(flags.B.value, False)
+		self.setFlag(flags.U.value, False)
 		self.stkp += -1
 		return 0
 	def PLA(self):
 		self.stkp += 1
-		self.a = read(0x0100 + self.stkp)
-		setFlag(flags.Z.value, self.a == 0)
-		setFlag(flags.N.value, self.a & 0x80)
+		self.a = self.read(0x0100 + self.stkp)
+		self.setFlag(flags.Z.value, self.a == 0x00)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 0
 	def PLP(self):
 		self.stkp += 1
 		self.status = self.read(0x0100 + self.stkp)
-		self.setFlag(flags.U.value, 1)
-		return 1
+		self.setFlag(flags.U.value, True)
+		return 0
 	def ROL(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = (self.fetched << 1) | self.getFlag(flags.C.value)
-		self.setFlag(flags.C.value, self.temp & 0xFF00)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.C.value, self.temp & 0xFF00 != 0x00) #was ==0xFF00
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
 		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
-			self.a = self.temp & 0xFF
+			self.a = self.temp & 0x00FF
 		else:
-			self.write(self.addr_abs, self.temp & 0xFF)
+			self.write(self.addr_abs, self.temp & 0x00FF)
 		return 0
 	def ROR(self):
-		self.fetch()
+		self.fetched = self.fetch()
 		self.temp = (self.getFlag(flags.C.value) << 7) | (self.fetched >> 1)
-		self.setFlag(flags.C.value, self.fetched & 0x01)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0)
-		self.setFlag(flags.N.value, self.temp & 0x80)
+		self.setFlag(flags.C.value, (self.fetched & 0x01) != 0x00)
+		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x80) != 0x00)
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
 		if self.lookup[self.temp1][self.temp2][1] == self.IMP:
-			self.a = self.temp & 0xFF
+			self.a = self.temp & 0x00FF
 		else:
-			self.write(self.addr_abs, self.temp & 0xFF)
+			self.write(self.addr_abs, self.temp & 0x00FF)
 		return 0
 	def RTI(self):
 		self.stkp += 1
 		self.status = self.read(0x0100 + self.stkp)
-		self.status = self.status & ~flags.B.value
-		self.status = self.status & ~flags.U.value
+		self.status = self.status & (~flags.B.value)
+		self.status = self.status & (~flags.U.value)
 		self.stkp += 1
 		self.pc = self.read(0x0100 + self.stkp)
 		self.stkp += 1
-		self.pc = self.pc | self.read(0x0100 + self.stkp) << 8
+		self.pc = self.pc | (self.read(0x0100 + self.stkp) << 8)
 		return 0
 	def RTS(self):
 		self.stkp += 1
 		self.pc = self.read(0x0100 + self.stkp)
 		self.stkp += 1
 		self.pc = self.pc | (self.read(0x0100 + self.stkp) << 8)
+		self.pc += 1
+		return 0
 	def SBC(self):
-		self.fetch()
-		self.value = self.fetched ^ 0xFF
+		self.fetched = self.fetch()
+		self.value = self.fetched ^ 0x00FF
 		self.temp = self.a + self.value + self.getFlag(flags.C.value)
-		self.setFlag(flags.C.value, self.temp & 0xFF00)
-		self.setFlag(flags.Z.value, (self.temp & 0xFF) == 0x00)
-		self.setFlag(flags.N.value, self.temp & 0x80)
-		self.setFlag(flags.V.value, (self.temp ^ self.a) & (self.temp ^ self.value) & 0x80)
-		self.a = self.temp & 0xFF
+		self.setFlag(flags.C.value, (self.temp & 0xFF00) != 0x00)
+		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x00)
+		self.setFlag(flags.V.value, ((self.temp ^ self.a) & (self.temp ^ self.value) & 0x0080) != 0x00)
+		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
+		self.a = self.temp & 0x00FF
 		return 1
 	def SEC(self):
 		self.setFlag(flags.C.value, True)
@@ -428,22 +445,22 @@ class cpu:
 	def TAX(self):
 		self.x = self.a
 		self.setFlag(flags.Z.value, self.x == 0x00)
-		self.setFlag(flags.N.value, self.x & 0x80)
+		self.setFlag(flags.N.value, (self.x & 0x80) != 0x00)
 		return 0
 	def TAY(self):
 		self.y = self.a
 		self.setFlag(flags.Z.value, self.y == 0x00)
-		self.setFlag(flags.N.value, self.y & 0x80)
+		self.setFlag(flags.N.value, (self.y & 0x80) != 0x00)
 		return 0
 	def TSX(self):
 		self.x = self.stkp
 		self.setFlag(flags.Z.value, self.x == 0x00)
-		self.setFlag(flags.N.value, self.x & 0x80)
+		self.setFlag(flags.N.value, (self.x & 0x80) != 0x00)
 		return 0
 	def TXA(self):
 		self.a = self.x
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 0
 	def TXS(self):
 		self.stkp = self.x
@@ -451,27 +468,29 @@ class cpu:
 	def TYA(self):
 		self.a = self.y
 		self.setFlag(flags.Z.value, self.a == 0x00)
-		self.setFlag(flags.N.value, self.a & 0x80)
+		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
 		return 0
 	def XXX(self):
 		return 0
 
-	def __init__(self, cpuram, bus):
-		self.cpuram = cpuram         #Passing RAM to the cpu
+	def __init__(self, bus):
+		#self.logfile = open("logfile.log", "a")
+		self.cpuram = bytearray(2048)         #Passing RAM to the cpu
 		self.bus = bus
+
 		self.a = 0x00             #Accumulator register
 		self.x = 0x00             #X register
 		self.y = 0x00             #Y register
 		self.stkp = 0x00          #Stack pointer (points to location on bus)
-		self.pc = 0x0000            #Program counter
+		self.pc = 0x0000          #Program counter
 		self.status = 0x00        #Status register
 
 		self.fetched = 0x00       #Fetched data
-
 		self.addr_abs = 0x0000
 		self.addr_rel =  0x00
 		self.opcode =  0x00
 		self.cycles = 0
+		self.clock_count = 0
 
 		self.lookup = [[[self.BRK, self.IMM, 7], [self.ORA, self.IZX, 6], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 3], [self.ORA, self.ZP0, 3], [self.ASL, self.ZP0, 5], [self.XXX, self.IMP, 5], [self.PHP, self.IMP, 3], [self.ORA, self.IMM, 2], [self.ASL, self.IMP, 2], [self.XXX, self.IMP, 2], [self.NOP, self.IMP, 4], [self.ORA, self.ABS, 4], [self.ASL, self.ABS, 6], [self.XXX, self.IMP, 6]],
 					   [[self.BPL, self.REL, 2], [self.ORA, self.IZY, 5], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 4], [self.ORA, self.ZPX, 4], [self.ASL, self.ZPX, 6], [self.XXX, self.IMP, 6], [self.CLC, self.IMP, 2], [self.ORA, self.ABY, 4], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 7], [self.NOP, self.IMP, 4], [self.ORA, self.ABX, 4], [self.ASL, self.ABX, 7], [self.XXX, self.IMP, 7]],
@@ -483,7 +502,7 @@ class cpu:
 					   [[self.BVS, self.REL, 2], [self.ADC, self.IZY, 5], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 4], [self.ADC, self.ZPX, 4], [self.ROR, self.ZPX, 6], [self.XXX, self.IMP, 6], [self.SEI, self.IMP, 2], [self.ADC, self.ABY, 4], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 7], [self.NOP, self.IMP, 4], [self.ADC, self.ABX, 4], [self.ROR, self.ABX, 7], [self.XXX, self.IMP, 7]],
 					   [[self.NOP, self.IMP, 2], [self.STA, self.IZX, 6], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 6], [self.STY, self.ZP0, 3], [self.STA, self.ZP0, 3], [self.STX, self.ZP0, 3], [self.XXX, self.IMP, 3], [self.DEY, self.IMP, 2], [self.NOP, self.IMP, 2], [self.TXA, self.IMP, 2], [self.XXX, self.IMP, 2], [self.STY, self.ABS, 4], [self.STA, self.ABS, 4], [self.STX, self.ABS, 4], [self.XXX, self.IMP, 4]],
 					   [[self.BCC, self.REL, 2], [self.STA, self.IZY, 6], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 6], [self.STY, self.ZPX, 4], [self.STA, self.ZPX, 4], [self.STX, self.ZPY, 4], [self.XXX, self.IMP, 4], [self.TYA, self.IMP, 2], [self.STA, self.ABY, 5], [self.TXS, self.IMP, 2], [self.XXX, self.IMP, 5], [self.NOP, self.IMP, 5], [self.STA, self.ABX, 5], [self.XXX, self.IMP, 5], [self.XXX, self.IMP, 5]],
-					   [[self.LDY, self.IMM, 2], [self.LDA, self.IZX, 6], [self.LDX, self.IMP, 2], [self.XXX, self.IMP, 6], [self.LDY, self.ZP0, 3], [self.LDA, self.ZP0, 3], [self.LDX, self.ZP0, 3], [self.XXX, self.IMP, 3], [self.TAY, self.IMP, 2], [self.LDA, self.IMM, 2], [self.TAX, self.IMP, 2], [self.XXX, self.IMP, 2], [self.LDY, self.ABS, 4], [self.LDA, self.ABS, 4], [self.LDX, self.ABS, 4], [self.XXX, self.IMP, 4]],
+					   [[self.LDY, self.IMM, 2], [self.LDA, self.IZX, 6], [self.LDX, self.IMM, 2], [self.XXX, self.IMP, 6], [self.LDY, self.ZP0, 3], [self.LDA, self.ZP0, 3], [self.LDX, self.ZP0, 3], [self.XXX, self.IMP, 3], [self.TAY, self.IMP, 2], [self.LDA, self.IMM, 2], [self.TAX, self.IMP, 2], [self.XXX, self.IMP, 2], [self.LDY, self.ABS, 4], [self.LDA, self.ABS, 4], [self.LDX, self.ABS, 4], [self.XXX, self.IMP, 4]],
 					   [[self.BCS, self.REL, 2], [self.LDA, self.IZY, 5], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 5], [self.LDY, self.ZPX, 4], [self.LDA, self.ZPX, 4], [self.LDX, self.ZPY, 4], [self.XXX, self.IMP, 4], [self.CLV, self.IMP, 2], [self.LDA, self.ABY, 4], [self.TSX, self.IMP, 2], [self.XXX, self.IMP, 4], [self.LDY, self.ABX, 4], [self.LDA, self.ABX, 4], [self.LDX, self.ABY, 4], [self.XXX, self.IMP, 4]],
 					   [[self.CPY, self.IMM, 2], [self.CMP, self.IZX, 6], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 8], [self.CPY, self.ZP0, 3], [self.CMP, self.ZP0, 3], [self.DEC, self.ZP0, 5], [self.XXX, self.IMP, 5], [self.INY, self.IMP, 2], [self.CMP, self.IMM, 2], [self.DEX, self.IMP, 2], [self.XXX, self.IMP, 2], [self.CPY, self.ABS, 4], [self.CMP, self.ABS, 4], [self.DEC, self.ABS, 6], [self.XXX, self.IMP, 6]],
 					   [[self.BNE, self.REL, 2], [self.CMP, self.IZY, 5], [self.XXX, self.IMP, 2], [self.XXX, self.IMP, 8], [self.NOP, self.IMP, 4], [self.CMP, self.ZPX, 4], [self.DEC, self.ZPX, 6], [self.XXX, self.IMP, 6], [self.CLD, self.IMP, 2], [self.CMP, self.ABY, 4], [self.NOP, self.IMP, 2], [self.XXX, self.IMP, 7], [self.NOP, self.IMP, 4], [self.CMP, self.ABX, 4], [self.DEC, self.ABX, 7], [self.XXX, self.IMP, 7]],
@@ -493,14 +512,12 @@ class cpu:
 	def write(self, addr, data):
 		self.bus.cpuWrite(addr, data)
 	def read(self, addr, readOnly = False):
-		self.temp3 = self.bus.cpuRead(addr, readOnly)
-		#print("read:", self.temp3)
-		return self.temp3
+		return self.bus.cpuRead(addr, readOnly)
 	def setFlag(self, flag, v):
 		if v == True:
-			self.status = self.status|flag
+			self.status = self.status | flag
 		else:
-			self.status = self.status&(~flag)
+			self.status = self.status & (~flag)
 	def getFlag(self, flag):
 		if (self.status & flag) > 0:
 			return 1
@@ -510,13 +527,15 @@ class cpu:
 		if self.cycles == 0:
 			self.opcode = self.read(self.pc)
 			self.setFlag(flags.U.value, True)
-			print("opcode:", self.opcode)
-			print("pc:", self.pc)
 			self.pc += 1
 			self.temp1 = ((self.opcode >> 4) & 0xFF)
 			self.temp2 = ((self.opcode) & 0x0F)
-			print("opcode pos:", self.temp1, self.temp2)
-			print("lookupi tulemus:", self.lookup[self.temp1][self.temp2])
+			'''self.logfile.write(str(hex(self.pc - 1)).split("x")[1].upper() + " " + str(self.lookup[self.temp1][self.temp2][0]).split(" ")[2] + " " + str(self.lookup[self.temp1][self.temp2][1]).split(" ")[2] + "\n")
+			if str(hex(self.pc - 1)).split("x")[1].upper() == "C66E":
+				self.logfile.close()
+				print("WRITING DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")'''
+			#if str(hex(self.pc - 1)).split("x")[1].upper() != "C291" and str(hex(self.pc - 1)).split("x")[1].upper() != "C28F":
+			#print(str(hex(self.pc - 1)).split("x")[1].upper(), str(self.lookup[self.temp1][self.temp2][0]).split(" ")[2], str(self.lookup[self.temp1][self.temp2][1]).split(" ")[2], "A", self.a, "X", self.x, "Y", self.y)
 			self.cycles = self.lookup[self.temp1][self.temp2][2]
 			self.additional_cycle1 = self.lookup[self.temp1][self.temp2][1]()
 			self.additional_cycle2 = self.lookup[self.temp1][self.temp2][0]()
@@ -529,8 +548,7 @@ class cpu:
 		self.lo = self.read(self.addr_abs + 0)
 		self.hi = self.read(self.addr_abs + 1)
 		self.pc = (self.hi << 8) | self.lo
-		self.pc = 0xC004
-		print("pc:", self.pc)
+		#self.pc = 0xC000
 		self.a = 0
 		self.x = 0
 		self.y = 0
@@ -541,54 +559,49 @@ class cpu:
 		self.fetched = 0x00
 		self.cycles = 8
 	def irq(self):
-		if getFlag(flags.I.value) == 0:
-			write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
+		if self.getFlag(flags.I.value) == 0:
+			self.write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
 			self.stkp += -1
-			write(0x0100 + self.stkp, self.pc & 0x00FF)
+			self.write(0x0100 + self.stkp, self.pc & 0x00FF)
 			self.stkp += -1
 
-			setFlag(flags.B.value, 0)
-			setFlag(flags.U.value, 1)
-			setFlag(flags.I.value, 1)
-			write(0x0100 + self.stkp, self.status)
+			self.setFlag(flags.B.value, False)
+			self.setFlag(flags.U.value, True)
+			self.setFlag(flags.I.value, True)
+			self.write(0x0100 + self.stkp, self.status)
 			self.stkp += -1
 
 			self.addr_abs  = 0xFFFE
-			self.lo = read(self.addr_abs + 0)
-			self.hi = read(self.addr_abs + 1)
+			self.lo = self.read(self.addr_abs + 0)
+			self.hi = self.read(self.addr_abs + 1)
 			self.pc = (self.hi << 8) | self.lo
 
 			self.cycles = 7
 	def nmi(self):
-		write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
+		self.write(0x0100 + self.stkp, (self.pc >> 8) & 0x00FF)
 		self.stkp += -1
-		write(0x0100 + self.stkp, self.pc & 0x00FF)
+		self.write(0x0100 + self.stkp, self.pc & 0x00FF)
 		self.stkp += -1
 
-		setFlag(flags.B.value, 0)
-		setFlag(flags.U.value, 1)
-		setFlag(flags.I.value, 1)
-		write(0x0100 + self.stkp, self.status)
+		self.setFlag(flags.B.value, False)
+		self.setFlag(flags.U.value, True)
+		self.setFlag(flags.I.value, True)
+		self.write(0x0100 + self.stkp, self.status)
 		self.stkp += -1
 
 		self.addr_abs  = 0xFFFA
-		self.lo = read(self.addr_abs + 0)
-		self.hi = read(self.addr_abs + 1)
+		self.lo = self.read(self.addr_abs + 0)
+		self.hi = self.read(self.addr_abs + 1)
 		self.pc = (self.hi << 8) | self.lo
 
 		self.cycles = 8
+
 	def fetch(self):
-		#print("fetch opcode:", self.opcode)
-		#print(self.fetched)
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
-		#print("fetch opcode pos:", self.temp1, self.temp2)
 		if self.lookup[self.temp1][self.temp2][1] != self.IMP:
 			self.fetched = self.read(self.addr_abs)
 		return self.fetched
-
-	def connectBus(self, bus):
-		self.bus = bus
 
 class flags(Enum):
 	C = 1 << 0 #Carry bit
