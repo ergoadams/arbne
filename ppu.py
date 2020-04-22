@@ -25,12 +25,55 @@ class ppu:
 
 		self.selectedPalette = 0x00
 
+		self.statusreg_unused = 0b00000
+		self.statusreg_sprite_overflow = 0b0
+		self.statusreg_sprite_zero_hit = 0b0
+		self.statusreg_vertical_blank = 0b0
+		#Putting the statusreg together:
 		self.statusreg = 0b00000000
+
+		self.maskreg_grayscale = 0b0
+		self.maskreg_render_background_left = 0b0
+		self.maskreg_render_sprites_left = 0b0
+		self.maskreg_render_background = 0b0
+		self.maskreg_render_sprites = 0b0
+		self.maskreg_enhance_red = 0b0
+		self.maskreg_enhance_green = 0b0
+		self.maskreg_enhance_blue = 0b0
+		#Putting the statusreg together:
 		self.maskreg = 0b00000000
+
+		self.controlreg_nametable_x = 0b0
+		self.controlreg_nametable_y = 0b0
+		self.controlreg_increment_mode = 0b0
+		self.controlreg_pattern_sprite = 0b0
+		self.controlreg_pattern_background = 0b0
+		self.controlreg_sprite_size = 0b0
+		self.controlreg_slave_mode = 0b0
+		self.controlreg_enable_nmi = 0b0
+
+		#Putting the statusreg together:
 		self.controlreg = 0b00000000
-		self.vram_addr = 0x0000
-		self.tram_addr = 0x0000
-		self.finex = 0x00
+
+		self.vram_addr_coarse_x = 0b00000
+		self.vram_addr_coarse_y = 0b00000
+		self.vram_addr_nametable_x = 0b0
+		self.vram_addr_nametable_y = 0b0
+		self.vram_addr_fine_y = 0b000
+		self.vram_addr_unused = 0b0
+		#Putting the statusreg together:
+		self.vram_addr = 0b0000000000000000
+
+		self.tram_addr_coarse_x = 0b00000
+		self.tram_addr_coarse_y = 0b00000
+		self.tram_addr_nametable_x = 0b0
+		self.tram_addr_nametable_y = 0b0
+		self.tram_addr_fine_y = 0b000
+		self.tram_addr_unused = 0b0
+		#Putting the statusreg together:
+		self.tram_addr = 0b0000000000000000
+
+		self.fine_x = 0x00
 
 		self.address_latch = 0x00
 		self.ppu_data_buffer = 0x00
@@ -39,11 +82,18 @@ class ppu:
 		self.bg_next_tile_attrib = 0x00
 		self.bg_next_tile_lsb = 0x00
 		self.bg_next_tile_msb = 0x00
+		self.bg_shifter_pattern_lo = 0x0000
+		self.bg_shifter_pattern_hi = 0x0000
+		self.bg_shifter_attrib_lo = 0x0000
+		self.bg_shifter_attrib_hi = 0x0000
 
 		self.nmi = False
 
 		pygame.init()
-		self.screen = pygame.display.set_mode((256, 240))
+		self.scaling_factor = 3
+		self.screen_width, self.screen_height = 256, 240
+		self.window = pygame.display.set_mode((self.screen_width*self.scaling_factor, self.screen_height*self.scaling_factor))
+		self.screen = pygame.Surface((self.screen_width, self.screen_height))
 		pygame.display.flip()
 
 
@@ -63,9 +113,7 @@ class ppu:
 		return self.patternTable[i]
 
 	def getColorFromPaletteRam(self, palette, pixel):
-		#self.ppuRead(0x3F00 + (palette << 2) + pixel)
-		#print("read", self.ppuRead(0x3F00 + (palette << 2) + pixel))
-		return self.palScreen[self.ppuRead(0x3F00 + (palette << 2) + pixel)]
+		return self.palScreen[self.ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F]
 
 	#Communication with main bus
 	def cpuRead(self, addr, readOnly = False):
@@ -76,9 +124,13 @@ class ppu:
 		elif addr == 0x0001: #Mask
 			pass
 		elif addr == 0x0002: #Status
-			self.statusreg = self.statusreg | 0b10000000
+			self.statusreg = 0b00000000 | self.statusreg_unused
+			self.statusreg |= (self.statusreg_sprite_overflow << 5)
+			self.statusreg |= (self.statusreg_sprite_zero_hit << 6)
+			self.statusreg |= (self.statusreg_vertical_blank << 7)
+
 			self.data = (self.statusreg & 0xE0) | (self.ppu_data_buffer & 0x1F)
-			self.statusreg = self.statusreg & (~0b10000000)
+			self.statusreg_vertical_blank = 0
 			self.address_latch = 0
 		elif addr == 0x0003: #OAM address
 			pass
@@ -90,24 +142,61 @@ class ppu:
 			pass
 		elif addr == 0x0007: #PPU data
 			self.data = self.ppu_data_buffer
-			self.ppu_data_buffer = self.ppuRead(self.vram_addr)
-			#print(self.ppu_address, self.ppu_data_buffer)
 
-			if self.vram_addr > 0x3F00:
+			self.vram_addr = 0b0000000000000000 | self.vram_addr_coarse_x
+			self.vram_addr |= (self.vram_addr_coarse_y << 5)
+			self.vram_addr |= (self.vram_addr_nametable_x << 10)
+			self.vram_addr |= (self.vram_addr_nametable_y << 11)
+			self.vram_addr |= (self.vram_addr_fine_y << 12)
+			self.vram_addr |= (self.vram_addr_unused << 15)
+
+			self.ppu_data_buffer = self.ppuRead(self.vram_addr)
+
+			if self.vram_addr >= 0x3F00:
 				self.data = self.ppu_data_buffer
-			if self.controlreg & 0b00000100 == 0b00000100:
+
+			if self.controlreg_increment_mode != 0:
 				self.vram_addr += 32
 			else:
 				self.vram_addr += 1
+
+			self.tempreg = str("{:016b}".format(self.vram_addr))
+			self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
+			self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
+			self.vram_addr_nametable_x = int(self.tempreg[5], 2)
+			self.vram_addr_nametable_y = int(self.tempreg[4], 2)
+			self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
+			self.vram_addr_unused = int(self.tempreg[0], 2)
 		return self.data
 
 	def cpuWrite(self, addr, data):
 		if addr == 0x0000: #Controll
 			self.controlreg = data
-			self.tram_addr = self.tram_addr | ((self.controlreg & 0b00000001) << 10)
-			self.tram_addr = self.tram_addr | ((self.controlreg & 0b00000001) << 11)
+
+			self.tempreg = str("{:08b}".format(self.controlreg))
+			self.controlreg_nametable_x = int(self.tempreg[7], 2)
+			self.controlreg_nametable_y = int(self.tempreg[6], 2)
+			self.controlreg_increment_mode = int(self.tempreg[5], 2)
+			self.controlreg_pattern_sprite = int(self.tempreg[4], 2)
+			self.controlreg_pattern_background = int(self.tempreg[3], 2)
+			self.controlreg_sprite_size = int(self.tempreg[2], 2)
+			self.controlreg_slave_mode = int(self.tempreg[1], 2)
+			self.controlreg_enable_nmi = int(self.tempreg[0], 2)
+
+			self.tram_addr_nametable_x = self.controlreg_nametable_x
+			self.tram_addr_nametable_y = self.controlreg_nametable_y
 		elif addr == 0x0001: #Mask
 			self.maskreg = data
+
+			self.tempreg = str("{:08b}".format(self.maskreg))
+			self.maskreg_grayscale = int(self.tempreg[7], 2)
+			self.maskreg_render_background_left = int(self.tempreg[6], 2)
+			self.maskreg_render_sprites_left = int(self.tempreg[5], 2)
+			self.maskreg_render_background = int(self.tempreg[4], 2)
+			self.maskreg_render_sprites = int(self.tempreg[3], 2)
+			self.maskreg_enhance_red = int(self.tempreg[2], 2)
+			self.maskreg_enhance_green = int(self.tempreg[1], 2)
+			self.maskreg_enhance_blue = int(self.tempreg[0], 2)
 		elif addr == 0x0002: #Status
 			pass
 		elif addr == 0x0003: #OAM address
@@ -117,34 +206,78 @@ class ppu:
 		elif addr == 0x0005: #Scroll
 			if self.address_latch == 0:
 				self.finex = data & 0x07
-				self.tram_addr = self.tram_addr | (data >> 3) #maybe push to left by 4?
+				self.tram_addr_coarse_x = data >> 3
 				self.address_latch = 1
 			else:
-				self.tram_addr = self.tram_addr | ((data & 0x07) << 12) #hard math maybe not 12
-				self.tram_addr = self.tram_addr | ((data >> 3) << 5)
+				self.tram_addr_fine_y = data & 0x07
+				self.tram_addr_coarse_y = data >> 3
 				self.address_latch = 0
 		elif addr == 0x0006: #PPU address
 			if self.address_latch == 0:
-				self.tram_addr = (self.tram_addr & 0x00FF) | (data << 8)
-				self.vram_addr = self.tram_addr
+				self.tram_addr = 0b0000000000000000 | self.tram_addr_coarse_x
+				self.tram_addr |= (self.tram_addr_coarse_y << 5)
+				self.tram_addr |= (self.tram_addr_nametable_x << 10)
+				self.tram_addr |= (self.tram_addr_nametable_y << 11)
+				self.tram_addr |= (self.tram_addr_fine_y << 12)
+				self.tram_addr |= (self.tram_addr_unused << 15)
+
+				self.tram_addr = ((data & 0x3F) << 8) | (self.tram_addr & 0x00FF)
+
+				self.tempreg = str("{:016b}".format(self.tram_addr))
+				self.tram_addr_coarse_x = int(self.tempreg[11::], 2)
+				self.tram_addr_coarse_y = int(self.tempreg[6:11], 2)
+				self.tram_addr_nametable_x = int(self.tempreg[5], 2)
+				self.tram_addr_nametable_y = int(self.tempreg[4], 2)
+				self.tram_addr_fine_y = int(self.tempreg[1:4], 2)
+				self.tram_addr_unused = int(self.tempreg[0], 2)
 				self.address_latch = 1
 			else:
+				self.tram_addr = 0b0000000000000000 | self.tram_addr_coarse_x
+				self.tram_addr |= (self.tram_addr_coarse_y << 5)
+				self.tram_addr |= (self.tram_addr_nametable_x << 10)
+				self.tram_addr |= (self.tram_addr_nametable_y << 11)
+				self.tram_addr |= (self.tram_addr_fine_y << 12)
+				self.tram_addr |= (self.tram_addr_unused << 15)
+
 				self.tram_addr = (self.tram_addr & 0xFF00) | data
+				self.tempreg = str("{:016b}".format(self.tram_addr))
+				self.tram_addr_coarse_x = int(self.tempreg[11::], 2)
+				self.tram_addr_coarse_y = int(self.tempreg[6:11], 2)
+				self.tram_addr_nametable_x = int(self.tempreg[5], 2)
+				self.tram_addr_nametable_y = int(self.tempreg[4], 2)
+				self.tram_addr_fine_y = int(self.tempreg[1:4], 2)
+				self.tram_addr_unused = int(self.tempreg[0], 2)
+
+				self.vram_addr = self.tram_addr
+				self.tempreg = str("{:016b}".format(self.vram_addr))
+				self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
+				self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
+				self.vram_addr_nametable_x = int(self.tempreg[5], 2)
+				self.vram_addr_nametable_y = int(self.tempreg[4], 2)
+				self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
+				self.vram_addr_unused = int(self.tempreg[0], 2)
 				self.address_latch = 0
 		elif addr == 0x0007: #PPU data
 			self.ppuWrite(self.vram_addr, data)
 
-			if self.controlreg & 0b00000100 == 0b00000100:
+			if self.controlreg_increment_mode == 1:
 				self.vram_addr += 32
 			else:
 				self.vram_addr += 1
+			self.tempreg = str("{:016b}".format(self.vram_addr))
+			self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
+			self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
+			self.vram_addr_nametable_x = int(self.tempreg[5], 2)
+			self.vram_addr_nametable_y = int(self.tempreg[4], 2)
+			self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
+			self.vram_addr_unused = int(self.tempreg[0], 2)
 
 	#Communication with ppu bus
 	def ppuRead(self, addr, readOnly = False):
 		self.data = 0x00
 		self.addr = addr & 0x3FFF
 
-		self.tempcheck, self.tempdata = self.cartridge.ppuRead(addr, readOnly)
+		self.tempcheck, self.tempdata = self.cartridge.ppuRead(self.addr, readOnly)
 		if self.tempcheck == True:
 			self.data = self.tempdata
 		elif self.addr >= 0x0000 and self.addr <= 0x1FFF:
@@ -183,7 +316,10 @@ class ppu:
 				self.addr = 0x0008
 			if self.addr == 0x001C:
 				self.addr = 0x000C
-			self.data = self.tblPalette[self.addr]
+			if self.maskreg_grayscale != 0:
+				self.data = self.tblPalette[self.addr] & 0x30
+			else:
+				self.data = self.tblPalette[self.addr] & 0x3F
 		return self.data
 
 	def ppuWrite(self, addr, data):
@@ -218,7 +354,6 @@ class ppu:
 					self.tblName[1][self.addr & 0x03FF] = data
 
 		elif self.addr >= 0x3F00 and self.addr <= 0x3FFF:
-			#print("PPUWRITEPALETTE")
 			self.addr = self.addr & 0x001F
 
 			if self.addr == 0x0010:
@@ -235,51 +370,148 @@ class ppu:
 	def connectCartridge(self, cartridge):
 		self.cartridge = cartridge
 
+	def incrementScrollX(self):
+		if self.maskreg_render_background or self.maskreg_render_sprites:
+			if self.vram_addr_coarse_x == 31:
+				self.vram_addr_coarse_x = 0
+				self.vram_addr_nametable_x = ~self.vram_addr_nametable_x
+			else:
+				self.vram_addr_coarse_x += 1
+
+	def incrementScrollY(self):
+		if self.maskreg_render_background or self.maskreg_render_sprites:
+			if self.vram_addr_fine_y < 7:
+				self.vram_addr_fine_y += 1
+			else:
+				self.vram_addr_fine_y = 0
+				if self.vram_addr_coarse_y == 29:
+					self.vram_addr_coarse_y = 0
+					self.vram_addr_nametable_y = ~self.vram_addr_nametable_y
+				elif self.vram_addr_coarse_y == 31:
+					self.vram_addr_coarse_y = 0
+				else:
+					self.vram_addr_coarse_y += 1
+
+	def transferAddressX(self):
+		if self.maskreg_render_background or self.maskreg_render_sprites:
+			self.vram_addr_nametable_x = self.tram_addr_nametable_x
+			self.vram_addr_coarse_x = self.tram_addr_coarse_x
+
+	def transferAddressY(self):
+		if self.maskreg_render_background or self.maskreg_render_sprites:
+			self.vram_addr_fine_y = self.tram_addr_fine_y
+			self.vram_addr_nametable_y = self.tram_addr_nametable_y
+			self.vram_addr_coarse_y = self.tram_addr_coarse_y
+
+	def loadBackgroundShifters(self):
+		self.bg_shifter_pattern_lo = (self.bg_shifter_pattern_lo & 0xFF00) | self.bg_next_tile_lsb
+		self.bg_shifter_pattern_hi = (self.bg_shifter_pattern_hi & 0xFF00) | self.bg_next_tile_msb
+		if self.bg_next_tile_attrib & 0x01 != 0x00:
+			self.bg_shifter_attrib_lo = (self.bg_shifter_attrib_lo & 0xFF00) | 0xFF
+		else:
+			self.bg_shifter_attrib_lo = (self.bg_shifter_attrib_lo & 0xFF00) | 0x00
+		if self.bg_next_tile_attrib & 0x10 != 0x00:
+			self.bg_shifter_attrib_hi = (self.bg_shifter_attrib_hi & 0xFF00) | 0xFF
+		else:
+			self.bg_shifter_attrib_hi = (self.bg_shifter_attrib_hi & 0xFF00) | 0x00
+
+	def updateShifters(self):
+		if self.maskreg_render_background != 0:
+			self.bg_shifter_pattern_lo = self.bg_shifter_pattern_lo << 1
+			self.bg_shifter_pattern_hi = self.bg_shifter_pattern_hi << 1
+			self.bg_shifter_attrib_lo = self.bg_shifter_attrib_lo << 1
+			self.bg_shifter_attrib_hi = self.bg_shifter_attrib_hi << 1
+
 	def clock(self):
 		if self.scanline >= -1 and self.scanline < 240:
+			if self.scanline == 0 and self.cycle == 0:
+				self.cycle = 1
+
 			if self.scanline == -1 and self.cycle == 1:
-				self.statusreg = self.statusreg & ~0b10000000
+				self.statusreg_vertical_blank = 0
 
 			if (self.cycle >= 2 and self.cycle < 258) or (self.cycle >= 321 and self.cycle < 338):
+				self.updateShifters()
 				self.switchcase = (self.cycle - 1) % 8
 				if self.switchcase == 0:
+					self.loadBackgroundShifters()
+					self.vram_addr = 0b0000000000000000 | self.vram_addr_coarse_x
+					self.vram_addr |= (self.vram_addr_coarse_y << 5)
+					self.vram_addr |= (self.vram_addr_nametable_x << 10)
+					self.vram_addr |= (self.vram_addr_nametable_y << 11)
+					self.vram_addr |= (self.vram_addr_fine_y << 12)
+					self.vram_addr |= (self.vram_addr_unused << 15)
+
 					self.bg_next_tile_id = self.ppuRead(0x2000 | (self.vram_addr & 0x0FFF))
+
 				elif self.switchcase == 2:
-					self.bg_next_tile_attrib = self.ppuRead(0x23C0 | (self.vram_addr & 0b100000000000) | (self.vram_addr & 0b10000000000) | (((self.vram_addr & 0b1111100000) >> 7) << 3) | (((self.vram_addr & 0b11111) >> 2)))
-					if (((self.vram_addr & 0b1111100000) >> 5) & 0x02) != 0x00:
+					self.bg_next_tile_attrib = self.ppuRead(0x23C0 | (self.vram_addr_nametable_y << 11) | (self.vram_addr_nametable_x << 10) | ((self.vram_addr_coarse_y >> 2) << 3) | (self.vram_addr_coarse_x >> 2))
+					if (self.vram_addr_coarse_y & 0x02) != 0:
 						self.bg_next_tile_attrib = self.bg_next_tile_attrib >> 4
-					if (self.vram_addr & 0b11111) & 0x02 != 0:
+					if (self.vram_addr_coarse_x & 0x02) != 0:
 						self.bg_next_tile_attrib = self.bg_next_tile_attrib >> 2
-					self.bg_next_tile_attrib = self.bg_next_tile_attrib & 0x03
+					self.bg_next_tile_attrib &= 0x03
 				elif self.switchcase == 4:
-					self.bg_next_tile_lsb = self.ppuRead(((self.controlreg & 0b10000) << 8) + (self.bg_next_tile_id << 4) +  ((self.vram_addr & 0b111000000000000) >> 12) + 0)
+					self.bg_next_tile_lsb = self.ppuRead((self.controlreg_pattern_background << 12) + (self.bg_next_tile_id << 4) + self.vram_addr_fine_y + 0)
 				elif self.switchcase == 6:
-					self.bg_next_tile_msb = self.ppuRead(((self.controlreg & 0b10000) << 8) + (self.bg_next_tile_id << 4) +  ((self.vram_addr & 0b111000000000000) >> 12) + 0)
+					self.bg_next_tile_msb = self.ppuRead((self.controlreg_pattern_background << 12) + (self.bg_next_tile_id << 4) + self.vram_addr_fine_y + 8)
 				elif self.switchcase == 7:
-					pass
-					#self.incrementScrollX()
+					self.incrementScrollX()
+
 			if self.cycle == 256:
-				pass
-				#self.incrementScrollY()
+				self.incrementScrollY()
 
 			if self.cycle == 257:
-				pass
-				#self.transferAddressX()
+				self.loadBackgroundShifters()
+				self.transferAddressX()
+
+			if self.cycle == 338 or self.cycle == 340:
+				self.vram_addr = 0b0000000000000000 | self.vram_addr_coarse_x
+				self.vram_addr |= (self.vram_addr_coarse_y << 5)
+				self.vram_addr |= (self.vram_addr_nametable_x << 10)
+				self.vram_addr |= (self.vram_addr_nametable_y << 11)
+				self.vram_addr |= (self.vram_addr_fine_y << 12)
+				self.vram_addr |= (self.vram_addr_unused << 15)
+
+				self.bg_next_tile_id = self.ppuRead(0x2000 | self.vram_addr & 0x0FFF)
 
 			if self.scanline == -1 and self.cycle >= 280 and self.cycle < 305:
-				pass
-				#self.transferAddressY()
+				self.transferAddressY()
 
 		if self.scanline == 240:
 			pass
 		#print(self.scanline, self.cycle)
-		if self.scanline == 241 and self.cycle == 1:
-			self.statusreg = self.statusreg | 0b10000000
-			if (self.controlreg & 0b10000000) != 0:
-				self.nmi = True
+		if self.scanline >= 241 and self.scanline < 261:
+			if self.scanline == 241 and self.cycle == 1:
+				self.statusreg_vertical_blank = 1
+				if self.controlreg_enable_nmi == 1:
+					self.nmi = True
 
-		#if self.cycle < 128 and self.scanline < 128:
-		#	self.screen.set_at((self.cycle, self.scanline), self.patternTable[0][self.scanline][self.cycle])
+		self.bg_pixel = 0x00
+		self.bg_palette = 0x00
+		if self.maskreg_render_background != 0:
+			self.bit_mux = 0x8000 >> self.fine_x
+			if (self.bg_shifter_pattern_lo & self.bit_mux) > 0:
+				self.p0_pixel = 1
+			else:
+				self.p0_pixel = 0
+			if (self.bg_shifter_pattern_hi & self.bit_mux) > 0:
+				self.p1_pixel = 1
+			else:
+				self.p1_pixel = 0
+			self.bg_pixel = (self.p1_pixel << 1) | self.p0_pixel
+
+			if (self.bg_shifter_attrib_lo & self.bit_mux) > 0:
+				self.bg_pal0 = 1
+			else:
+				self.bg_pal0 = 0
+			if (self.bg_shifter_attrib_hi & self.bit_mux) > 0:
+				self.bg_pal1 = 1
+			else:
+				self.bg_pal1 = 0
+			self.bg_palette = (self.bg_pal1 << 1) | self.bg_pal0
+
+		self.screen.set_at((self.cycle - 1, self.scanline), self.getColorFromPaletteRam(self.bg_palette, self.bg_pixel))
 
 		self.cycle += 1
 		if self.cycle >= 341:
@@ -289,13 +521,9 @@ class ppu:
 				self.scanline = -1
 				self.framecomplete = True
 
-				self.patternTable[0] = self.getPatternTable(0, self.selectedPalette)
 				self.framecount += 1
 				print(self.framecount)
-
-				for self.tempy in range(128):
-					for self.tempx in range(128):
-						self.screen.set_at((self.tempy, self.tempx), self.patternTable[0][self.tempy][self.tempx])
+				self.window.blit(pygame.transform.scale(self.screen, self.window.get_rect().size), (0, 0))
 				pygame.display.flip()
 
 		for event in pygame.event.get():

@@ -247,6 +247,7 @@ class cpu:
 	def DEC(self):
 		self.fetched = self.fetch()
 		self.temp = self.fetched - 1
+		self.write(self.addr_abs, self.temp & 0x00FF)
 		self.setFlag(flags.Z.value, (self.temp & 0x00FF) == 0x0000)
 		self.setFlag(flags.N.value, (self.temp & 0x0080) != 0x00)
 		return 0
@@ -296,6 +297,7 @@ class cpu:
 		return 0
 	def LDA(self):
 		self.fetched = self.fetch()
+		self.fetched = self.fetched & 0xFFFF
 		self.a = self.fetched
 		self.setFlag(flags.Z.value, self.a == 0x00)
 		self.setFlag(flags.N.value, (self.a & 0x80) != 0x00)
@@ -600,7 +602,7 @@ class cpu:
 		self.temp1 = ((self.opcode >> 4) & 0xFF)
 		self.temp2 = ((self.opcode) & 0x0F)
 		if self.lookup[self.temp1][self.temp2][1] != self.IMP:
-			self.fetched = self.read(self.addr_abs)
+			self.fetched = self.read(self.addr_abs & 0xFFFF)
 		return self.fetched
 
 class flags(Enum):
