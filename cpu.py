@@ -532,6 +532,7 @@ class cpu:
 			return 1
 		else:
 			return 0
+
 	def clock(self):
 		if self.cycles == 0:
 			self.opcode = self.read(self.pc)

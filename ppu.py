@@ -96,12 +96,11 @@ class ppu:
 		self.spriteZeroBeingRendered = False
 
 		pygame.init()
-		self.scaling_factor = 3
+		self.scaling_factor = 2
 		self.screen_width, self.screen_height = 256, 240
-		self.window = pygame.display.set_mode((self.screen_width*self.scaling_factor + 128, self.screen_height*self.scaling_factor))
+		self.window = pygame.display.set_mode((self.screen_width*self.scaling_factor, self.screen_height*self.scaling_factor))
 		self.screen = pygame.Surface((self.screen_width, self.screen_height))
 		pygame.display.flip()
-
 
 	def getPatternTable(self, i, palette):
 		for self.tileY in range(16):
@@ -125,9 +124,27 @@ class ppu:
 	def cpuRead(self, addr, readOnly = False):
 		self.data = 0x00
 
-		if addr == 0x0000: #Controll
+		if addr == 0x0000: #Control
+			'''self.controlreg = 0b00000000 | self.controlreg_nametable_x
+			self.controlreg |= (self.controlreg_nametable_y << 1)
+			self.controlreg |= (self.controlreg_increment_mode << 2)
+			self.controlreg |= (self.controlreg_pattern_sprite << 3)
+			self.controlreg |= (self.controlreg_pattern_background << 4)
+			self.controlreg |= (self.controlreg_sprite_size << 5)
+			self.controlreg |= (self.controlreg_slave_mode << 6)
+			self.controlreg |= (self.controlreg_enable_nmi << 7)
+			self.data = self.controlreg'''
 			pass
 		elif addr == 0x0001: #Mask
+			'''self.maskreg = 0b00000000 | self.maskreg_grayscale
+			self.maskreg |= (self.maskreg_render_background_left << 1)
+			self.maskreg |= (self.maskreg_render_sprites_left << 2)
+			self.maskreg |= (self.maskreg_render_background << 3)
+			self.maskreg |= (self.maskreg_render_sprites << 4)
+			self.maskreg |= (self.maskreg_enhance_red << 5)
+			self.maskreg |= (self.maskreg_enhance_green << 6)
+			self.maskreg |= (self.maskreg_enhance_blue << 7)
+			self.data = self.maskreg'''
 			pass
 		elif addr == 0x0002: #Status
 			self.statusreg = 0b00000000 | self.statusreg_unused
@@ -135,11 +152,11 @@ class ppu:
 			self.statusreg |= (self.statusreg_sprite_zero_hit << 6)
 			self.statusreg |= (self.statusreg_vertical_blank << 7)
 
-			self.data = (self.statusreg & 0xE0) | (self.ppu_data_buffer & 0x1F)
+			self.data = (self.statusreg & 0xE0)# | (self.ppu_data_buffer & 0x1F)
 			self.statusreg_vertical_blank = 0
 			self.address_latch = 0
 		elif addr == 0x0003: #OAM address
-			pass
+			self.data = self.oam_addr
 		elif addr == 0x0004: #OAM data
 			self.data = self.oam[self.oam_addr]
 		elif addr == 0x0005: #Scroll
@@ -156,10 +173,15 @@ class ppu:
 			self.vram_addr |= (self.vram_addr_fine_y << 12)
 			self.vram_addr |= (self.vram_addr_unused << 15)
 
-			self.ppu_data_buffer = self.ppuRead(self.vram_addr)
+			#self.ppu_data_buffer = self.ppuRead(self.vram_addr - 0x1000)
+			self.data = self.ppuRead(self.vram_addr) # maybe -0x1000
 
-			if self.vram_addr >= 0x3F00:
+			if self.vram_addr & 0x3FFF < 0x3F00:
+				self.buffer = self.data
 				self.data = self.ppu_data_buffer
+				self.ppu_data_buffer = self.buffer
+			else:
+				self.ppu_data_buffer = self.ppuRead(self.vram_addr - 0x1000)
 
 			if self.controlreg_increment_mode != 0:
 				self.vram_addr += 32
@@ -206,8 +228,7 @@ class ppu:
 		elif addr == 0x0002: #Status
 			pass
 		elif addr == 0x0003: #OAM address
-			self.oam_addr = data
-			#print("2003 WRITE", self.oam_addr)
+			self.oam_addr = data & 0xFF
 		elif addr == 0x0004: #OAM data
 			self.oam[self.oam_addr] = data
 			self.oam_addr = (self.oam_addr + 1) & 0xFF
@@ -499,12 +520,12 @@ class ppu:
 		self.bg_shifter_pattern_lo = (self.bg_shifter_pattern_lo & 0xFF00) | self.bg_next_tile_lsb
 		self.bg_shifter_pattern_hi = (self.bg_shifter_pattern_hi & 0xFF00) | self.bg_next_tile_msb
 
-		if self.bg_next_tile_attrib & 0b01 != 0:
+		if self.bg_next_tile_attrib & 0x01 != 0:
 			self.bg_shifter_attrib_lo = (self.bg_shifter_attrib_lo & 0xFF00) | 0xFF
 		else:
 			self.bg_shifter_attrib_lo = (self.bg_shifter_attrib_lo & 0xFF00) | 0x00
 
-		if self.bg_next_tile_attrib & 0b10 != 0:
+		if self.bg_next_tile_attrib & 0x02 != 0:
 			self.bg_shifter_attrib_hi = (self.bg_shifter_attrib_hi & 0xFF00) | 0xFF
 		else:
 			self.bg_shifter_attrib_hi = (self.bg_shifter_attrib_hi & 0xFF00) | 0x00
@@ -525,13 +546,14 @@ class ppu:
 					self.sprite_shifter_pattern_hi[i] = self.sprite_shifter_pattern_hi[i] << 1
 
 	def flipByte(self, b):
-		self.b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
-		self.b = ((self.b & 0xCC) >> 2) | ((self.b & 0x33) << 2)
-		self.b = ((self.b & 0xAA) >> 1) | ((self.b & 0x55) << 1)
-		return self.b
+		b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
+		b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
+		b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
+		return b
 
 	def clock(self):
 		if (self.scanline >= -1) and (self.scanline < 240):
+			# BACKGROUND RENDERING ------------------------------------------------------------------------------------------------------
 			if self.scanline == 0 and self.cycle == 0 and (self.maskreg_render_background != 0 or self.maskreg_render_sprites != 0):
 				self.cycle = 1
 
@@ -605,11 +627,11 @@ class ppu:
 					self.sprite_shifter_pattern_lo[i] = 0
 					self.sprite_shifter_pattern_hi[i] = 0
 
-				self.oamEntry = 0
+				self.oamEntry = self.oam_addr & 0xFF
 				self.spriteZeroHitPossible = False
 
-				while self.oamEntry < 64 and self.sprite_count < 9: # <=
-					self.diff = self.scanline - self.oam[self.oamEntry * 4]
+				while self.oamEntry < 255 and self.sprite_count < 9: # <=
+					self.diff = self.scanline - self.oam[self.oamEntry]
 					if self.controlreg_sprite_size != 0:
 						self.tempdiff = 16
 					else:
@@ -619,12 +641,12 @@ class ppu:
 						if self.sprite_count < 8:
 							if self.oamEntry == 0:
 								self.spriteZeroHitPossible = True
-							self.spriteScanline[self.sprite_count * 4] = self.oam[self.oamEntry * 4]
-							self.spriteScanline[(self.sprite_count * 4) + 1] = self.oam[(self.oamEntry * 4) + 1]
-							self.spriteScanline[(self.sprite_count * 4) + 2] = self.oam[(self.oamEntry * 4) + 2]
-							self.spriteScanline[(self.sprite_count * 4) + 3] = self.oam[(self.oamEntry * 4) + 3]
+							self.spriteScanline[self.sprite_count * 4] = self.oam[self.oamEntry]
+							self.spriteScanline[(self.sprite_count * 4) + 1] = self.oam[self.oamEntry + 1]
+							self.spriteScanline[(self.sprite_count * 4) + 2] = self.oam[self.oamEntry + 2]
+							self.spriteScanline[(self.sprite_count * 4) + 3] = self.oam[self.oamEntry + 3]
 						self.sprite_count += 1
-					self.oamEntry += 1
+					self.oamEntry = self.oamEntry + 4
 
 				if self.sprite_count >= 8:
 					self.statusreg_sprite_overflow = 1
@@ -789,17 +811,16 @@ class ppu:
 				self.framecomplete = True
 
 				self.framecount += 1
-				print(self.framecount)
-				#print(self.oam)
-				self.patternTable[0] = self.getPatternTable(0, self.selectedPalette)
-				self.patternTable[1] = self.getPatternTable(1, self.selectedPalette)
-				#print(self.patternTable[0])
-				for self.tempy in range(128):
-					for self.tempx in range(128):
-						self.window.set_at((self.tempx + self.screen_width*self.scaling_factor, self.tempy), self.patternTable[0][self.tempx][self.tempy])
-						self.window.set_at((self.tempx + self.screen_width*self.scaling_factor, self.tempy + 128), self.patternTable[1][self.tempx][self.tempy])
+
+				#self.patternTable[0] = self.getPatternTable(0, self.selectedPalette)
+				#self.patternTable[1] = self.getPatternTable(1, self.selectedPalette)
+
+				#for self.tempy in range(128):
+				#	for self.tempx in range(128):
+				#		self.window.set_at((self.tempx + self.screen_width*self.scaling_factor, self.tempy), self.patternTable[0][self.tempx][self.tempy])
+				#		self.window.set_at((self.tempx + self.screen_width*self.scaling_factor, self.tempy + 128), self.patternTable[1][self.tempx][self.tempy])
+
 				self.scalesize = self.window.get_rect().size
-				self.scalesize = (self.scalesize[0] - 128, self.scalesize[1])
 				self.window.blit(pygame.transform.scale(self.screen, self.scalesize), (0, 0))
 				pygame.display.flip()
 				#print("OAM ADDR", self.oam_addr)

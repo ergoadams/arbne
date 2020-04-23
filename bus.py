@@ -89,7 +89,7 @@ class bus:
 					if self.systemClockCounter % 2 == 0:
 						self.dma_data = self.cpuRead((self.dma_page << 8) | self.dma_addr)
 					else:
-						self.ppu.oam[self.dma_addr & 0xFF] = self.dma_data
+						self.ppu.oam[self.dma_addr] = self.dma_data
 						self.dma_addr = (self.dma_addr + 1) & 0xFF
 						if self.dma_addr == self.dma_addr_start:
 							self.dma_transfer = False
