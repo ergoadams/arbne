@@ -2,6 +2,13 @@ from enum import Enum
 
 class cpu:
 
+	def fetch(self):
+		self.temp1 = ((self.opcode >> 4) & 0xFF)
+		self.temp2 = ((self.opcode) & 0x0F)
+		if self.lookup[self.temp1][self.temp2][1] != self.IMP:
+			self.fetched = self.read(self.addr_abs & 0xFFFF)
+		return self.fetched
+
 	#Addressing modes
 	def IMP(self):
 		self.fetched = self.a
@@ -550,7 +557,6 @@ class cpu:
 		self.lo = self.read(self.addr_abs + 0)
 		self.hi = self.read(self.addr_abs + 1)
 		self.pc = (self.hi << 8) | self.lo
-		#self.pc = 0xC000
 		self.a = 0
 		self.x = 0
 		self.y = 0
@@ -598,12 +604,6 @@ class cpu:
 
 		self.cycles = 8
 
-	def fetch(self):
-		self.temp1 = ((self.opcode >> 4) & 0xFF)
-		self.temp2 = ((self.opcode) & 0x0F)
-		if self.lookup[self.temp1][self.temp2][1] != self.IMP:
-			self.fetched = self.read(self.addr_abs & 0xFFFF)
-		return self.fetched
 
 class flags(Enum):
 	C = 1 << 0 #Carry bit

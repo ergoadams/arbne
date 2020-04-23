@@ -4,6 +4,9 @@ class mapper:
 			self.prgBanks = prgBanks
 			self.chrBanks = chrBanks
 
+		def reset(self):
+			pass
+
 		def cpuMapRead(self, addr):
 			if addr >= 0x8000  and addr <= 0xFFFF:
 				if self.prgBanks > 1:

@@ -21,17 +21,29 @@ class cartridge:
 			self.tv_system2 = ord(fp.read(1))		#1 byte
 			self.unused = fp.read(5)			#char 5
 
-			if self.mapper1 & 0x04:
+			print("Name:", self.name)
+			print("PRG rom chunks:", self.prg_rom_chunks)
+			print("CHR rom chunks:", self.chr_rom_chunks)
+			print("Mapper1, Mapper2:", self.mapper1, self.mapper2)
+			print("PRG ram size:", self.prg_ram_size)
+			print("TV system 1, TV system 2:", self.tv_system1, self.tv_system2)
+
+			if (self.mapper1 & 0x04) != 0:
 				fp.read(512)
 
 			self.mapperID = ((self.mapper2 >> 4) << 4) | (self.mapper1 >> 4)
-			if self.mapper1 & 0x01 == 0x01:
+			if self.mapper1 & 0x01 != 0:
 				self.mirror = "VERTICAL"
 			else:
 				self.mirror = "HORIZONTAL"
+			print("Mirror:", self.mirror)
 
 
 			self.filetype = 1
+			if (self.mapper2 & 0x0C) == 0x08:
+				self.filetype = 2
+
+			print("Filetype:", self.filetype)
 
 			if self.filetype == 0:
 				pass
@@ -39,14 +51,19 @@ class cartridge:
 			elif self.filetype == 1:
 				self.PRGbanks = self.prg_rom_chunks
 				self.PRGmemory = bytearray(fp.read(self.PRGbanks*16384))
-				print(len(self.PRGmemory))
 
 				self.CHRbanks = self.chr_rom_chunks
-				self.CHRmemory = bytearray(fp.read(self.CHRbanks*8192))
-				print(len(self.CHRmemory))
+				if self.CHRbanks == 0:
+					self.CHRmemory = bytearray(8192)
+				else:
+					self.CHRmemory = bytearray(fp.read(self.CHRbanks*8192))
 
 			elif self.filetype == 2:
-				pass
+				self.PRGbanks = ((self.prg_ram_size & 0x07) << 8) | self.prg_rom_chunks
+				self.PRGmemory = bytearray(fp.read(self.PRGbanks*16384))
+
+				self.CHRbanks = ((self.prg_ram_size & 0x38) << 8) | self.chr_rom_chunks
+				self.CHRmemory = bytearray(fp.read(self.CHRbanks*8192))
 
 			print("MapperID:", self.mapperID)
 			self.mapper = mapper()
@@ -59,11 +76,17 @@ class cartridge:
 	def imageValid(self):
 		return self.imageValid
 
+	def reset(self):
+		self.umapper.reset()
+
 	#Communication with main bus
 	def cpuRead(self, addr):
 		self.tempcheck, self.mapped_addr = self.umapper.cpuMapRead(addr)
 		if self.tempcheck == True:
-			self.data = self.PRGmemory[self.mapped_addr]
+			if self.mapped_addr == 0xFFFFFFFFF:
+				return True, 0x00
+			else:
+				self.data = self.PRGmemory[self.mapped_addr]
 			return True, self.data
 		else:
 			return False, 0x00
@@ -71,7 +94,10 @@ class cartridge:
 	def cpuWrite(self, addr, data):
 		self.tempcheck, self.mapped_addr = self.umapper.cpuMapWrite(addr)
 		if self.tempcheck == True:
-			self.PRGmemory[self.mapped_addr] = data
+			if self.mapped_addr == 0xFFFFFFFF:
+				return True
+			else:
+				self.PRGmemory[self.mapped_addr] = data
 			return True
 		else:
 			return False
