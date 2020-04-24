@@ -69,6 +69,16 @@ class cartridge:
 			self.mapper = mapper()
 			if self.mapperID == 0:
 				self.umapper = self.mapper.mapper_000(self.PRGbanks, self.CHRbanks)
+			if self.mapperID == 1:
+				self.umapper = self.mapper.mapper_001(self.PRGbanks, self.CHRbanks)
+			if self.mapperID == 2:
+				self.umapper = self.mapper.mapper_002(self.PRGbanks, self.CHRbanks)
+			if self.mapperID == 3:
+				self.umapper = self.mapper.mapper_003(self.PRGbanks, self.CHRbanks)
+			if self.mapperID == 4:
+				self.umapper = self.mapper.mapper_004(self.PRGbanks, self.CHRbanks)
+			if self.mapperID == 66:
+				self.umapper = self.mapper.mapper_066(self.PRGbanks, self.CHRbanks)
 
 			self.imageValid = True
 
@@ -81,10 +91,10 @@ class cartridge:
 
 	#Communication with main bus
 	def cpuRead(self, addr):
-		self.tempcheck, self.mapped_addr = self.umapper.cpuMapRead(addr)
+		self.tempcheck, self.mapped_addr, self.data = self.umapper.cpuMapRead(addr)
 		if self.tempcheck == True:
 			if self.mapped_addr == 0xFFFFFFFFF:
-				return True, 0x00
+				return True, self.data
 			else:
 				self.data = self.PRGmemory[self.mapped_addr]
 			return True, self.data
@@ -92,7 +102,7 @@ class cartridge:
 			return False, 0x00
 
 	def cpuWrite(self, addr, data):
-		self.tempcheck, self.mapped_addr = self.umapper.cpuMapWrite(addr)
+		self.tempcheck, self.mapped_addr = self.umapper.cpuMapWrite(addr, data)
 		if self.tempcheck == True:
 			if self.mapped_addr == 0xFFFFFFFF:
 				return True

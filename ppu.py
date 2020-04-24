@@ -4,6 +4,7 @@ from random import randint
 
 class ppu:
 	def __init__(self):
+		self.running = True
 		self.tblName = [bytearray(1024), bytearray(1024)]
 		self.tblPattern = [bytearray(4096), bytearray(4096)]
 		self.tblPalette = bytearray(32)
@@ -723,33 +724,34 @@ class ppu:
 		self.fg_palette = 0x00
 		self.fg_priority = 0x00
 		if self.maskreg_render_sprites != 0:
-			self.spriteZeroBeingRendered = False
-			for i in range(self.sprite_count):
-				if self.spriteScanline[(i * 4) + 3] == 0:
+			if self.maskreg_render_sprites_left != 0 or self.cycle >= 9:
+				self.spriteZeroBeingRendered = False
+				for i in range(self.sprite_count):
+					if self.spriteScanline[(i * 4) + 3] == 0:
 
-					if (self.sprite_shifter_pattern_lo[i] & 0x80) != 0x00:
-						self.fg_pixel_lo = 1
-					else:
-						self.fg_pixel_lo = 0
+						if (self.sprite_shifter_pattern_lo[i] & 0x80) != 0x00:
+							self.fg_pixel_lo = 1
+						else:
+							self.fg_pixel_lo = 0
 
-					if (self.sprite_shifter_pattern_hi[i] & 0x80) != 0x00:
-						self.fg_pixel_hi = 1
-					else:
-						self.fg_pixel_hi = 0
+						if (self.sprite_shifter_pattern_hi[i] & 0x80) != 0x00:
+							self.fg_pixel_hi = 1
+						else:
+							self.fg_pixel_hi = 0
 
-					self.fg_pixel = (self.fg_pixel_hi << 1) | self.fg_pixel_lo
+						self.fg_pixel = (self.fg_pixel_hi << 1) | self.fg_pixel_lo
 
-					self.fg_palette = (self.spriteScanline[(i * 4) + 2] & 0x03) + 0x04
+						self.fg_palette = (self.spriteScanline[(i * 4) + 2] & 0x03) + 0x04
 
-					if (self.spriteScanline[(i * 4) + 2]  & 0x20) == 0x00:
-						self.fg_priority = 1
-					else:
-						self.fg_priority = 0
+						if (self.spriteScanline[(i * 4) + 2]  & 0x20) == 0x00:
+							self.fg_priority = 1
+						else:
+							self.fg_priority = 0
 
-					if self.fg_pixel != 0:
-						if i == 0:
-							self.spriteZeroBeingRendered = True
-						break
+						if self.fg_pixel != 0:
+							if i == 0:
+								self.spriteZeroBeingRendered = True
+							break
 
 		self.pixel = 0x00
 		self.palette = 0x00
@@ -775,16 +777,20 @@ class ppu:
 
 			if self.spriteZeroHitPossible == True and self.spriteZeroBeingRendered == True:
 				if self.maskreg_render_background & self.maskreg_render_sprites:
-					if ~(self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0:
-						if self.cycle >= 9 and self.cycle < 258:
+					if (self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0:
+						if self.cycle >= 9 and self.cycle < 256:
 							self.statusreg_sprite_zero_hit = 1
 					else:
-						if self.cycle >= 1 and self.cycle < 258:
+						if self.cycle >= 1 and self.cycle < 256:
 							self.statusreg_sprite_zero_hit = 1
 
 		self.screen.set_at((self.cycle - 1, self.scanline), self.getColorFromPaletteRam(self.palette, self.pixel))
 
 		self.cycle += 1
+		if self.maskreg_render_background or self.maskreg_render_sprites:
+			if self.cycle == 260 and self.scanline < 240:
+				self.cartridge.umapper.scanline()
+
 		if self.cycle >= 341:
 			self.cycle = 0
 			self.scanline += 1
@@ -805,8 +811,7 @@ class ppu:
 				self.scalesize = self.window.get_rect().size
 				self.window.blit(pygame.transform.scale(self.screen, self.scalesize), (0, 0))
 				pygame.display.flip()
-				#print("OAM ADDR", self.oam_addr)
 
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
-				pygame.quit()
+				self.running = False

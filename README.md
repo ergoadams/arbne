@@ -11,3 +11,4 @@ A Python based NES emulator attempt.
 - [x] Fix VRAM reads should be delayed in a buffer issue (vram_access.nes)
 - [ ] PPU open bus issues (ppu_open_bus.nes)
 - [x] Check background rendering and zero hit (smb is not rendering correctly)
+- [ ] Zerohit on the bottom (Y = 255), double height lower sprite tile should hit bottom of bg tile

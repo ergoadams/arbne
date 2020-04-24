@@ -21,6 +21,15 @@ class bus:
 		self.dma_transfer = False
 		self.dma_dummy = True
 
+		self.cpucycles = 0
+		self.ppucycles = 0
+		self.cpuavg = 0
+		self.cputotal = 0
+		self.ppuavg = 0
+		self.pputotal = 0
+		self.cpustarttime = 0
+		self.ppustarttime = 0
+
 	def cpuWrite(self, addr, data):
 		#print(hex(addr))
 		self.tempcheck = self.cartridge.cpuWrite(addr, data)
@@ -32,7 +41,7 @@ class bus:
 
 		elif addr >= 0x2000 and addr <= 0x3FFF:
 			self.ppu.cpuWrite(addr & 0x0007, data)
-			
+
 		elif addr == 0x4014:
 			self.dma_page = data
 			self.dma_addr = self.ppu.oam_addr
@@ -79,6 +88,11 @@ class bus:
 
 	def clock(self):
 		self.ppu.clock()
+		self.ppucycles += 1
+		if self.ppucycles % 10000 == 0:
+			self.pputotal += round(time.perf_counter() - self.ppustarttime, 5)
+			self.ppuavg = round(self.pputotal / (self.ppucycles // 10000), 5)
+			self.ppustarttime = time.perf_counter()
 
 		if self.systemClockCounter % 3 == 0:
 			if self.dma_transfer == True:
@@ -142,9 +156,19 @@ class bus:
 					self.reset()
 
 				self.cpu.clock()
+				self.cpucycles += 1
+				if self.cpucycles % 10000 == 0:
+					self.cputotal += round(time.perf_counter() - self.cpustarttime, 5)
+					self.cpuavg = round(self.cputotal / (self.cpucycles // 10000), 5)
+					self.cpustarttime = time.perf_counter()
+					print("10000 clockcycles took (seconds) PPU:", self.ppuavg, "CPU:", self.cpuavg, "              ", '\x1b\r', end="")
 
 		if self.ppu.nmi == True:
 			self.ppu.nmi = False
 			self.cpu.nmi()
+
+		if self.cartridge.umapper.irqState():
+			self.cartridge.umapper.irqClear()
+			self.cpu.irq()
 
 		self.systemClockCounter += 1
