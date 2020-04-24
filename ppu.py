@@ -125,26 +125,8 @@ class ppu:
 		self.data = 0x00
 
 		if addr == 0x0000: #Control
-			'''self.controlreg = 0b00000000 | self.controlreg_nametable_x
-			self.controlreg |= (self.controlreg_nametable_y << 1)
-			self.controlreg |= (self.controlreg_increment_mode << 2)
-			self.controlreg |= (self.controlreg_pattern_sprite << 3)
-			self.controlreg |= (self.controlreg_pattern_background << 4)
-			self.controlreg |= (self.controlreg_sprite_size << 5)
-			self.controlreg |= (self.controlreg_slave_mode << 6)
-			self.controlreg |= (self.controlreg_enable_nmi << 7)
-			self.data = self.controlreg'''
 			pass
 		elif addr == 0x0001: #Mask
-			'''self.maskreg = 0b00000000 | self.maskreg_grayscale
-			self.maskreg |= (self.maskreg_render_background_left << 1)
-			self.maskreg |= (self.maskreg_render_sprites_left << 2)
-			self.maskreg |= (self.maskreg_render_background << 3)
-			self.maskreg |= (self.maskreg_render_sprites << 4)
-			self.maskreg |= (self.maskreg_enhance_red << 5)
-			self.maskreg |= (self.maskreg_enhance_green << 6)
-			self.maskreg |= (self.maskreg_enhance_blue << 7)
-			self.data = self.maskreg'''
 			pass
 		elif addr == 0x0002: #Status
 			self.statusreg = 0b00000000 | self.statusreg_unused
@@ -152,11 +134,11 @@ class ppu:
 			self.statusreg |= (self.statusreg_sprite_zero_hit << 6)
 			self.statusreg |= (self.statusreg_vertical_blank << 7)
 
-			self.data = (self.statusreg & 0xE0)# | (self.ppu_data_buffer & 0x1F)
+			self.data = (self.statusreg & 0xE0) | (self.ppu_data_buffer & 0x1F)
 			self.statusreg_vertical_blank = 0
 			self.address_latch = 0
 		elif addr == 0x0003: #OAM address
-			self.data = self.oam_addr
+			pass
 		elif addr == 0x0004: #OAM data
 			self.data = self.oam[self.oam_addr]
 		elif addr == 0x0005: #Scroll
@@ -546,9 +528,9 @@ class ppu:
 					self.sprite_shifter_pattern_hi[i] = self.sprite_shifter_pattern_hi[i] << 1
 
 	def flipByte(self, b):
-		b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
-		b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
-		b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
+		b = (b & 0xF0) >> 4 | (b & 0x0F) << 4
+		b = (b & 0xCC) >> 2 | (b & 0x33) << 2
+		b = (b & 0xAA) >> 1 | (b & 0x55) << 1
 		return b
 
 	def clock(self):
@@ -792,8 +774,8 @@ class ppu:
 				self.palette = self.bg_palette
 
 			if self.spriteZeroHitPossible == True and self.spriteZeroBeingRendered == True:
-				if self.maskreg_render_background != 0 & self.maskreg_render_sprites != 0:
-					if (self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0:
+				if self.maskreg_render_background & self.maskreg_render_sprites:
+					if ~(self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0:
 						if self.cycle >= 9 and self.cycle < 258:
 							self.statusreg_sprite_zero_hit = 1
 					else:

@@ -32,7 +32,7 @@ class bus:
 
 		elif addr >= 0x2000 and addr <= 0x3FFF:
 			self.ppu.cpuWrite(addr & 0x0007, data)
-
+			
 		elif addr == 0x4014:
 			self.dma_page = data
 			self.dma_addr = self.ppu.oam_addr
