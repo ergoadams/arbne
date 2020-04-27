@@ -17,8 +17,11 @@ A Python based NES emulator attempt.
 
 ## Things to optimize (data is based on the emulator running for 20 seconds, originally about 11 frames)
 Biggest problems right now: in a long run, pygame event.get is bad
+
 														bus cpuWrite
+
 														cpu CMP, LDA, ABS
+														
 														cpu BEQ, REL, fetch, ppu ppuRead
 
 
