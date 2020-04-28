@@ -26,7 +26,6 @@ class mapper:
 		def ppuMapWrite(self, addr):
 			return True if addr >= 0x0000 and addr <= 0x1FFF and self.chrBanks == 0 else False
 
-
 	class mapper_001:
 		def __init__(self, prgBanks, chrBanks):
 			self.prgBanks = prgBanks
@@ -301,7 +300,7 @@ class mapper:
 				return False, addr
 			return False, addr
 		def ppuMapRead(self, addr):
-			
+
 			if addr >= 0x0000 and addr <= 0x03FF:
 				return True, self.CHRBank[0] + (addr & 0x03FF)
 			if addr >= 0x0400 and addr <= 0x07FF:

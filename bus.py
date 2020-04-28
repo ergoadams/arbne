@@ -8,15 +8,12 @@ class bus:
 		self.cpu = cpu(self)
 		self.ppu = ppu()
 		self.controller_state = [0, 0]
-
 		self.systemClockCounter = 0
-
 		self.dma_page = 0
 		self.dma_addr = 0
 		self.dma_data = 0
 		self.dma_transfer = False
 		self.dma_dummy = True
-
 		self.cpucycles = 0
 		self.ppucycles = 0
 		self.cpuavg = 0
@@ -27,7 +24,7 @@ class bus:
 		self.ppustarttime = 0
 
 	def cpuWrite(self, addr, data):
-		
+
 		if self.cartridge.cpuWrite(addr, data) == False:
 			if addr >= 0x0000 and addr <= 0x1FFF:
 				self.cpu.cpuram[addr & 0x07FF] = data
@@ -38,9 +35,8 @@ class bus:
 				self.dma_addr = self.ppu.oam_addr
 				self.dma_addr_start = self.ppu.oam_addr
 				self.dma_transfer = True
-			elif addr >= 0x4016 and addr <= 0x4017:
-				self.controller_state[addr & 0x0001] = self.ppu.controller[addr & 0x0001]
-
+			elif addr == 0x4016 or addr == 0x4017:
+				self.controller_state[0 if addr == 0x4016 else 1] = self.ppu.controller[0 if addr == 0x4016 else 1]
 	def cpuRead(self, addr, readOnly = False):
 		self.data = 0x00
 		self.tempcheck, self.data = self.cartridge.cpuRead(addr)
@@ -49,7 +45,7 @@ class bus:
 				self.data = self.cpu.cpuram[addr & 0x07FF]
 			elif addr >= 0x2000 and addr <= 0x3FFF:
 				self.data = self.ppu.cpuRead(addr & 0x0007, readOnly)
-			elif addr >= 0x4016 and addr <= 0x4017:
+			elif addr == 0x4016 or addr == 0x4017:
 				self.data = 1 if (self.controller_state[addr & 0x0001] & 0x80) > 0 else 0
 				self.controller_state[addr & 0x0001] = self.controller_state[addr & 0x0001] << 1
 		return self.data

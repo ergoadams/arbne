@@ -88,6 +88,7 @@ class ppu:
 		self.screen = pygame.Surface((self.screen_width, self.screen_height))
 		self.screenarray = pygame.PixelArray(self.screen)
 		pygame.display.flip()
+		self.scalesize = self.window.get_rect().size
 
 	def getColorFromPaletteRam(self, addr):
 		self.addr = addr & 0x1F
@@ -103,7 +104,7 @@ class ppu:
 		elif addr == 0x0001:
 			pass
 		elif addr == 0x0002:
-			self.statusreg = 0 | self.statusreg_unused
+			self.statusreg = self.statusreg_unused
 			self.statusreg |= (self.statusreg_sprite_overflow << 5)
 			self.statusreg |= (self.statusreg_sprite_zero_hit << 6)
 			self.statusreg |= (self.statusreg_vertical_blank << 7)
@@ -120,7 +121,7 @@ class ppu:
 			pass
 		elif addr == 0x0007:
 			self.data = self.ppu_data_buffer
-			self.vram_addr = 0 | self.vram_addr_coarse_x
+			self.vram_addr = self.vram_addr_coarse_x
 			self.vram_addr |= (self.vram_addr_coarse_y << 5)
 			self.vram_addr |= (self.vram_addr_nametable_x << 10)
 			self.vram_addr |= (self.vram_addr_nametable_y << 11)
@@ -134,40 +135,37 @@ class ppu:
 			else:
 				self.ppu_data_buffer = self.ppuRead(self.vram_addr - 0x1000)
 			self.vram_addr = self.vram_addr + 32 if self.controlreg_increment_mode else self.vram_addr + 1
-			self.tempreg = str("{:016b}".format(self.vram_addr))
-			self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
-			self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
-			self.vram_addr_nametable_x = int(self.tempreg[5], 2)
-			self.vram_addr_nametable_y = int(self.tempreg[4], 2)
-			self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
-			self.vram_addr_unused = int(self.tempreg[0], 2)
+			self.vram_addr_coarse_x = self.vram_addr & 0b11111
+			self.vram_addr_coarse_y = (self.vram_addr & 0b1111100000) >> 5
+			self.vram_addr_nametable_x = (self.vram_addr & 0b10000000000) >> 10
+			self.vram_addr_nametable_y = (self.vram_addr & 0b100000000000) >> 11
+			self.vram_addr_fine_y = (self.vram_addr & 0b111000000000000) >> 12
+			self.vram_addr_unused = (self.vram_addr & 0b1000000000000000) >> 15
 		return self.data
 
 	def cpuWrite(self, addr, data):
 		if addr == 0x0000:
 			self.controlreg = data
-			self.tempreg = str("{:08b}".format(self.controlreg))
-			self.controlreg_nametable_x = int(self.tempreg[7], 2)
-			self.controlreg_nametable_y = int(self.tempreg[6], 2)
-			self.controlreg_increment_mode = int(self.tempreg[5], 2)
-			self.controlreg_pattern_sprite = int(self.tempreg[4], 2)
-			self.controlreg_pattern_background = int(self.tempreg[3], 2)
-			self.controlreg_sprite_size = int(self.tempreg[2], 2)
-			self.controlreg_slave_mode = int(self.tempreg[1], 2)
-			self.controlreg_enable_nmi = int(self.tempreg[0], 2)
+			self.controlreg_nametable_x= self.controlreg & 0b1
+			self.controlreg_nametable_y = (self.controlreg & 0b10) >> 1
+			self.controlreg_increment_mode = (self.controlreg & 0b100) >> 2
+			self.controlreg_pattern_sprite = (self.controlreg & 0b1000) >> 3
+			self.controlreg_pattern_background = (self.controlreg & 0b10000) >> 4
+			self.controlreg_sprite_size = (self.controlreg & 0b100000) >> 5
+			self.controlreg_slave_mode = (self.controlreg & 0b1000000) >> 6
+			self.controlreg_enable_nmi = (self.controlreg & 0b10000000) >> 7
 			self.tram_addr_nametable_x = self.controlreg_nametable_x
 			self.tram_addr_nametable_y = self.controlreg_nametable_y
 		elif addr == 0x0001:
 			self.maskreg = data
-			self.tempreg = str("{:08b}".format(self.maskreg))
-			self.maskreg_grayscale = int(self.tempreg[7], 2)
-			self.maskreg_render_background_left = int(self.tempreg[6], 2)
-			self.maskreg_render_sprites_left = int(self.tempreg[5], 2)
-			self.maskreg_render_background = int(self.tempreg[4], 2)
-			self.maskreg_render_sprites = int(self.tempreg[3], 2)
-			self.maskreg_enhance_red = int(self.tempreg[2], 2)
-			self.maskreg_enhance_green = int(self.tempreg[1], 2)
-			self.maskreg_enhance_blue = int(self.tempreg[0], 2)
+			self.maskreg_grayscale= self.maskreg & 0b1
+			self.maskreg_render_background_left = (self.maskreg & 0b10) >> 1
+			self.maskreg_render_sprites_left = (self.maskreg & 0b100) >> 2
+			self.maskreg_render_background = (self.maskreg & 0b1000) >> 3
+			self.maskreg_render_sprites = (self.maskreg & 0b10000) >> 4
+			self.maskreg_enhance_red = (self.maskreg & 0b100000) >> 5
+			self.maskreg_enhance_green = (self.maskreg & 0b1000000) >> 6
+			self.maskreg_enhance_blue = (self.maskreg & 0b10000000) >> 7
 		elif addr == 0x0002:
 			pass
 		elif addr == 0x0003:
@@ -185,7 +183,7 @@ class ppu:
 				self.tram_addr_coarse_y = data >> 3
 				self.address_latch = 0
 		elif addr == 0x0006:
-			self.tram_addr = 0 | self.tram_addr_coarse_x
+			self.tram_addr = self.tram_addr_coarse_x
 			self.tram_addr |= (self.tram_addr_coarse_y << 5)
 			self.tram_addr |= (self.tram_addr_nametable_x << 10)
 			self.tram_addr |= (self.tram_addr_nametable_y << 11)
@@ -194,47 +192,37 @@ class ppu:
 			if self.address_latch == 0:
 				self.tram_addr = ((data & 0x3F) << 8) | (self.tram_addr & 0x00FF)
 				self.address_latch = 1
-
 			else:
 				self.tram_addr = (self.tram_addr & 0xFF00) | data
 				self.vram_addr = self.tram_addr
-
-				self.tempreg = str("{:016b}".format(self.vram_addr))
-				self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
-				self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
-				self.vram_addr_nametable_x = int(self.tempreg[5], 2)
-				self.vram_addr_nametable_y = int(self.tempreg[4], 2)
-				self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
-				self.vram_addr_unused = int(self.tempreg[0], 2)
+				self.vram_addr_coarse_x = self.vram_addr & 0b11111
+				self.vram_addr_coarse_y = (self.vram_addr & 0b1111100000) >> 5
+				self.vram_addr_nametable_x = (self.vram_addr & 0b10000000000) >> 10
+				self.vram_addr_nametable_y = (self.vram_addr & 0b100000000000) >> 11
+				self.vram_addr_fine_y = (self.vram_addr & 0b111000000000000) >> 12
+				self.vram_addr_unused = (self.vram_addr & 0b1000000000000000) >> 15
 				self.address_latch = 0
-
-			self.tempreg = str("{:016b}".format(self.tram_addr))
-			self.tram_addr_coarse_x = int(self.tempreg[11::], 2)
-			self.tram_addr_coarse_y = int(self.tempreg[6:11], 2)
-			self.tram_addr_nametable_x = int(self.tempreg[5], 2)
-			self.tram_addr_nametable_y = int(self.tempreg[4], 2)
-			self.tram_addr_fine_y = int(self.tempreg[1:4], 2)
-			self.tram_addr_unused = int(self.tempreg[0], 2)
-
+			self.tram_addr_coarse_x = self.tram_addr & 0b11111
+			self.tram_addr_coarse_y = (self.tram_addr & 0b1111100000) >> 5
+			self.tram_addr_nametable_x = (self.tram_addr & 0b10000000000) >> 10
+			self.tram_addr_nametable_y = (self.tram_addr & 0b100000000000) >> 11
+			self.tram_addr_fine_y = (self.tram_addr & 0b111000000000000) >> 12
+			self.tram_addr_unused = (self.tram_addr & 0b1000000000000000) >> 15
 		elif addr == 0x0007: #PPU data
-			self.vram_addr = 0b0000000000000000 | self.vram_addr_coarse_x
+			self.vram_addr = self.vram_addr_coarse_x
 			self.vram_addr |= (self.vram_addr_coarse_y << 5)
 			self.vram_addr |= (self.vram_addr_nametable_x << 10)
 			self.vram_addr |= (self.vram_addr_nametable_y << 11)
 			self.vram_addr |= (self.vram_addr_fine_y << 12)
 			self.vram_addr |= (self.vram_addr_unused << 15)
-
 			self.ppuWrite(self.vram_addr, data)
-
-			self.vram_addr = self.vram_addr + 32 if self.controlreg_increment_mode else self.vram_addr + 1
-
-			self.tempreg = str("{:016b}".format(self.vram_addr))
-			self.vram_addr_coarse_x = int(self.tempreg[11::], 2)
-			self.vram_addr_coarse_y = int(self.tempreg[6:11], 2)
-			self.vram_addr_nametable_x = int(self.tempreg[5], 2)
-			self.vram_addr_nametable_y = int(self.tempreg[4], 2)
-			self.vram_addr_fine_y = int(self.tempreg[1:4], 2)
-			self.vram_addr_unused = int(self.tempreg[0], 2)
+			self.vram_addr += 32 if self.controlreg_increment_mode else 1
+			self.vram_addr_coarse_x = self.vram_addr & 0b11111
+			self.vram_addr_coarse_y = (self.vram_addr & 0b1111100000) >> 5
+			self.vram_addr_nametable_x = (self.vram_addr & 0b10000000000) >> 10
+			self.vram_addr_nametable_y = (self.vram_addr & 0b100000000000) >> 11
+			self.vram_addr_fine_y = (self.vram_addr & 0b111000000000000) >> 12
+			self.vram_addr_unused = (self.vram_addr & 0b1000000000000000) >> 15
 
 	def ppuRead(self, addr, readOnly = False):
 		self.data = 0x00
@@ -423,7 +411,7 @@ class ppu:
 				self.switchcase = (self.cycle - 1) % 8
 				if self.switchcase == 0:
 					self.loadBackgroundShifters()
-					self.vram_addr = 0 | self.vram_addr_coarse_x
+					self.vram_addr = self.vram_addr_coarse_x
 					self.vram_addr |= (self.vram_addr_coarse_y << 5)
 					self.vram_addr |= (self.vram_addr_nametable_x << 10)
 					self.vram_addr |= (self.vram_addr_nametable_y << 11)
@@ -516,8 +504,7 @@ class ppu:
 				self.statusreg_vertical_blank = 1
 				if self.controlreg_enable_nmi:
 					self.nmi = True
-		self.bg_pixel = 0
-		self.bg_palette = 0
+		self.bg_pixel, self.bg_palette = 0, 0
 		if self.maskreg_render_background:
 			if self.maskreg_render_background_left or self.cycle >= 9:
 				self.bit_mux = 0x8000 >> self.fine_x
@@ -527,9 +514,7 @@ class ppu:
 				self.bg_pal0 = 1 if self.bg_shifter_attrib_lo & self.bit_mux else 0
 				self.bg_pal1 = 1 if self.bg_shifter_attrib_hi & self.bit_mux else 0
 				self.bg_palette = (self.bg_pal1 << 1) | self.bg_pal0
-		self.fg_pixel = 0
-		self.fg_palette = 0
-		self.fg_priority = 0
+		self.fg_pixel, self.fg_palette, self.fg_priority = 0, 0, 0
 		if self.maskreg_render_sprites:
 			if self.maskreg_render_sprites_left or self.cycle >= 9:
 				self.spriteZeroBeingRendered = False
@@ -545,37 +530,26 @@ class ppu:
 							if i == 0:
 								self.spriteZeroBeingRendered = True
 							break
-		self.pixel = 0
-		self.palette = 0
+		self.pixel, self.palette = 0, 0
 		if self.bg_pixel == 0 and self.fg_pixel == 0:
-			self.pixel = 0
-			self.palette = 0
+			self.pixel, self.palette = 0, 0
 		elif self.bg_pixel == 0 and self.fg_pixel > 0:
-			self.pixel = self.fg_pixel
-			self.palette = self.fg_palette
+			self.pixel, self.palette = self.fg_pixel, self.fg_palette
 		elif self.bg_pixel > 0 and self.fg_pixel == 0:
-			self.pixel = self.bg_pixel
-			self.palette = self.bg_palette
+			self.pixel, self.palette = self.bg_pixel, self.bg_palette
 		elif self.bg_pixel > 0 and self.fg_pixel > 0:
-			if self.fg_priority:
-				self.pixel, self.palette = self.fg_pixel, self.fg_palette
-			else:
-				self.pixel, self.palette = self.bg_pixel, self.bg_palette
-			if self.spriteZeroHitPossible == True and self.spriteZeroBeingRendered == True:
-				if self.maskreg_render_background & self.maskreg_render_sprites:
-					if (self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0:
-						if self.cycle >= 9 and self.cycle < 256:
-							self.statusreg_sprite_zero_hit = 1
-					else:
-						if self.cycle >= 1 and self.cycle < 256:
-							self.statusreg_sprite_zero_hit = 1
+			self.pixel, self.palette = (self.fg_pixel, self.fg_palette) if self.fg_priority else (self.bg_pixel, self.bg_palette)
+			if self.spriteZeroHitPossible == True and self.spriteZeroBeingRendered == True and self.maskreg_render_background & self.maskreg_render_sprites:
+				if (self.maskreg_render_background_left | self.maskreg_render_sprites_left) == 0 and self.cycle >= 9 and self.cycle < 256:
+					self.statusreg_sprite_zero_hit = 1
+				else:
+					if self.cycle >= 1 and self.cycle < 256:
+						self.statusreg_sprite_zero_hit = 1
 		if self.cycle <= 256 and self.cycle >= 1 and self.scanline < 240:
-			self.tempaddr = 0x3F00 + (self.palette << 2) + self.pixel
-			self.screenarray[self.cycle - 1, self.scanline] = self.getColorFromPaletteRam(self.tempaddr)
+			self.screenarray[self.cycle - 1, self.scanline] = self.getColorFromPaletteRam(0x3F00 + (self.palette << 2) + self.pixel)
 		self.cycle += 1
-		if self.maskreg_render_background or self.maskreg_render_sprites:
-			if self.cycle == 260 and self.scanline < 240:
-				self.cartridge.umapper.scanline()
+		if (self.maskreg_render_background or self.maskreg_render_sprites) and self.cycle == 260 and self.scanline < 240:
+			self.cartridge.umapper.scanline()
 		if self.cycle >= 341:
 			self.cycle = 0
 			self.scanline += 1
@@ -584,21 +558,28 @@ class ppu:
 				self.odd_frame = True if self.odd_frame == False else False
 				self.framecomplete = True
 				self.framecount += 1
-				self.scalesize = self.window.get_rect().size
 				self.window.blit(pygame.transform.scale(self.screen, self.scalesize), (0, 0))
 				pygame.display.update()
 				self.frametime = time.perf_counter() - self.starttime
 				self.starttime = time.perf_counter()
 				self.pressedKey = pygame.key.get_pressed()
 				self.controller[0] = 0x00
-				self.controller[0] |= 0x80 if self.pressedKey[pygame.K_x] else 0
-				self.controller[0] |= 0x40 if self.pressedKey[pygame.K_z] else 0
-				self.controller[0] |= 0x20 if self.pressedKey[pygame.K_a] else 0
-				self.controller[0] |= 0x10 if self.pressedKey[pygame.K_s] else 0
-				self.controller[0] |= 0x08 if self.pressedKey[pygame.K_UP] else 0
-				self.controller[0] |= 0x04 if self.pressedKey[pygame.K_DOWN] else 0
-				self.controller[0] |= 0x02 if self.pressedKey[pygame.K_LEFT] else 0
-				self.controller[0] |= 0x01 if self.pressedKey[pygame.K_RIGHT] else 0
+				if self.pressedKey[pygame.K_x]:
+					self.controller[0] |= 0x80
+				if self.pressedKey[pygame.K_z]:
+					self.controller[0] |= 0x40
+				if self.pressedKey[pygame.K_a]:
+					self.controller[0] |= 0x20
+				if self.pressedKey[pygame.K_s]:
+					self.controller[0] |= 0x10
+				if self.pressedKey[pygame.K_UP]:
+					self.controller[0] |= 0x08
+				if self.pressedKey[pygame.K_DOWN]:
+					self.controller[0] |= 0x04
+				if self.pressedKey[pygame.K_LEFT]:
+					self.controller[0] |= 0x02
+				if self.pressedKey[pygame.K_RIGHT]:
+					self.controller[0] |= 0x01
 				if self.pressedKey[pygame.K_r]:
 					self.reset()
 				for event in pygame.event.get():

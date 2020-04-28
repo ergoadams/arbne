@@ -18,4 +18,4 @@ while bus.ppu.running and running:
 	if time.perf_counter() - starttime > 20:
 		running = False
 print("\n")
-print(bus.ppu.framecount)
+print(bus.ppu.framecount, "frames")
