@@ -16,7 +16,7 @@ A Python based NES emulator attempt.
 - [x] Lookup table
 
 ## Things to optimize (data is based on the emulator running for 20 seconds, originally about 11 frames)
-Biggest problems right now are bus cpuWrite, cpu ABS, LDA, CMP, REL, ZP0, fetch and ppu ppuRead
+Biggest problems right now are bus cpuWrite, cpu ABS, LDA, CMP, REL, ZP0, fetch and ppu ppuRead  
 We got to 1 fps! Now need to get it only 60 times faster...
 
 | Function                   | original cumulative time | optimized time? | number of calls | calls to time ratio |
