@@ -1,4 +1,4 @@
-# nes
+# A Really Bad NES Emulator (ARBNE)
 A Python based NES emulator attempt.
 
 ## TODO
