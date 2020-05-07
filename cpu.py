@@ -1,9 +1,7 @@
 from enum import Enum
-import numpy as np
 import time
 
 class cpu:
-
 	def fetch(self):
 		if self.addressmode != self.IMP:
 			self.fetched = self.read(self.addr_abs & 0xFFFF)
@@ -422,13 +420,20 @@ class cpu:
 		return 0
 
 	def __init__(self, bus):
-		self.cpuram = np.zeros(2048, dtype = int)
+		self.cpuram = [0] * 2048
 		self.bus = bus
-		self.a = self.x = self.y = 0
-		self.stkp = self.pc = self.status = self.fetched = 0
-		self.addr_abs = self.addr_rel = 0
+		self.a = 0
+		self.x = 0
+		self.y = 0
+		self.stkp = 0
+		self.pc = 0
+		self.status = 0
+		self.fetched = 0
+		self.addr_abs = 0
+		self.addr_rel = 0
 		self.opcode = 0
-		self.cycles = self.clock_count = 0
+		self.cycles = 0
+		self.clock_count = 0
 		self.lookup = {
 			   	  0: (self.BRK, self.IMM, 7),   1: (self.ORA, self.IZX, 6),   2: (self.XXX, self.IMP, 2),   3: (self.XXX, self.IMP, 8),   4: (self.NOP, self.IMP, 3),   5: (self.ORA, self.ZP0, 3),   6: (self.ASL, self.ZP0, 5),   7: (self.XXX, self.IMP, 5),   8: (self.PHP, self.IMP, 3),   9: (self.ORA, self.IMM, 2),   10: (self.ASL, self.IMP, 2),  11: (self.XXX, self.IMP, 2),  12: (self.NOP, self.IMP, 4),  13: (self.ORA, self.ABS, 4), 14: (self.ASL, self.ABS, 6), 15: (self.XXX, self.IMP, 6),
 				  16: (self.BPL, self.REL, 2),  17: (self.ORA, self.IZY, 5),  18: (self.XXX, self.IMP, 2),  19: (self.XXX, self.IMP, 8),  20: (self.NOP, self.IMP, 4),  21: (self.ORA, self.ZPX, 4),  22: (self.ASL, self.ZPX, 6),  23: (self.XXX, self.IMP, 6),  24: (self.CLC, self.IMP, 2),  25: (self.ORA, self.ABY, 4),  26: (self.NOP, self.IMP, 2),  27: (self.XXX, self.IMP, 7),  28: (self.NOP, self.IMP, 4),  29: (self.ORA, self.ABX, 4), 30: (self.ASL, self.ABX, 7), 31: (self.XXX, self.IMP, 7),

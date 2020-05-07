@@ -1,4 +1,4 @@
-# nes
+# A Really Bad NES Emulator (ARBNE)
 A Python based NES emulator attempt.
 
 ## TODO
@@ -18,8 +18,10 @@ A Python based NES emulator attempt.
 ## Things to optimize (data is based on the emulator running for 20 seconds, originally about 11 frames)
 Biggest problems right now are bus cpuWrite, cpu ABS, LDA, CMP, REL, ZP0, fetch and ppu ppuRead  
 We got to 1 fps! Now need to get it only 60 times faster...
+May 7th update: average of 2 fps reached! Only need to get it 30 times faster now. 
 
-Remaking table, moved work to Ubuntu..
+
+Remade table, moved work to Ubuntu..
 
 | Function                   | original cumulative time | optimized time? | number of calls | calls to time ratio |
 | -------------------------- | ------------------------ | --------------- | --------------- | ------------------- |
