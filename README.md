@@ -14,10 +14,12 @@ A Python based NES emulator attempt.
 - [ ] Zerohit on the bottom (Y = 255), double height lower sprite tile should hit bottom of bg tile
 - [ ] Optimize, optimize, optimize...
 - [x] Lookup table
+- [ ] Seperate PPU from the bus, to have the ability to run the emulation without picture
+- [ ] Debug mode
 
 ## Things to optimize (data is based on the emulator running for 20 seconds, originally about 11 frames)
 Biggest problems right now are bus cpuWrite, cpu ABS, LDA, CMP, REL, ZP0, fetch and ppu ppuRead  
-We got to 1 fps! Now need to get it only 60 times faster...
+We got to 1 fps! Now need to get it only 60 times faster...    
 May 7th update: average of 2 fps reached! Only need to get it 30 times faster now. 
 
 

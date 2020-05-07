@@ -15,7 +15,7 @@ running = True
 while bus.ppu.running and running:
 	bus.clock()
 	clockcycles += 1
-	#if time.perf_counter() - starttime > 20:
-	#	running = False
+	if time.perf_counter() - starttime > 20:
+		running = False
 print("\n")
 print(bus.ppu.framecount, "frames", bus.ppu.framecount / (time.perf_counter() - starttime), "FPS")

@@ -24,8 +24,7 @@ class bus:
 		self.ppustarttime = 0
 
 	def cpuWrite(self, addr, data):
-
-		if self.cartridge.cpuWrite(addr, data) == False:
+		if not self.cartridge.cpuWrite(addr, data):
 			if addr >= 0x0000 and addr <= 0x1FFF:
 				self.cpu.cpuram[addr & 0x07FF] = data
 			elif addr >= 0x2000 and addr <= 0x3FFF:
@@ -37,10 +36,11 @@ class bus:
 				self.dma_transfer = True
 			elif addr == 0x4016 or addr == 0x4017:
 				self.controller_state[0 if addr == 0x4016 else 1] = self.ppu.controller[0 if addr == 0x4016 else 1]
+
 	def cpuRead(self, addr, readOnly = False):
 		self.data = 0x00
 		self.tempcheck, self.data = self.cartridge.cpuRead(addr)
-		if self.tempcheck == False:
+		if not self.tempcheck:
 			if addr >= 0x0000 and addr <= 0x1FFF:
 				self.data = self.cpu.cpuram[addr & 0x07FF]
 			elif addr >= 0x2000 and addr <= 0x3FFF:
@@ -68,8 +68,8 @@ class bus:
 	def clock(self):
 		self.ppu.clock()
 		if self.systemClockCounter % 3 == 0:
-			if self.dma_transfer == True:
-				if self.dma_dummy == True:
+			if self.dma_transfer:
+				if self.dma_dummy:
 					if self.systemClockCounter % 2 == 1:
 						self.dma_dummy = False
 				else:
@@ -84,7 +84,7 @@ class bus:
 			else:
 				self.cpu.clock()
 				self.cpucycles += 1
-				if self.ppu.nmi == True:
+				if self.ppu.nmi:
 					self.ppu.nmi = False
 					self.cpu.nmi()
 				if self.cartridge.umapper.irqState():
