@@ -15,7 +15,8 @@ A Python based NES emulator attempt.
 - [ ] Optimize, optimize, optimize...
 - [x] Lookup table
 - [ ] Seperate PPU from the bus, to have the ability to run the emulation without picture
-- [ ] Debug mode
+- [x] Debug mode
+- [x] Illegal opcodes (well I mean there are some weird ones, but the ones in nestest pass)
 
 ## Things to optimize (data is based on the emulator running for 20 seconds, originally about 11 frames)
 Biggest problems right now are bus cpuWrite, cpu ABS, LDA, CMP, REL, ZP0, fetch and ppu ppuRead  

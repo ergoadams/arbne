@@ -2,11 +2,15 @@ from cartridge import cartridge
 import pygame
 
 class ppu:
-    def __init__(self):
+    def __init__(self, bus):
+        self.bus = bus
         self.running = True
-        self.tblName = [[0] * 1024, [0] * 1024]
-        self.tblPattern = [[0] * 4096, [0] * 4096]
-        self.tblPalette = [0] * 32
+        self.tblNameblock = [bytearray(1024), bytearray(1024)]
+        self.tblName = [memoryview(self.tblNameblock[0]), memoryview(self.tblNameblock[1])]
+        self.tblPatternblock = [bytearray(4096), bytearray(4096)]
+        self.tblPattern = [memoryview(self.tblPatternblock[0]), memoryview(self.tblPatternblock[1])]
+        self.tblPaletteblock = bytearray(32)
+        self.tblPalette = memoryview(self.tblPaletteblock)
         self.palScreen = {0: (84, 84, 84), 1: (0, 30, 116), 2: (8, 16, 144), 3: (48, 0, 136), 4: (68, 0, 100), 5: (92, 0, 48), 6: (84, 4, 0), 7: (60, 24, 0), 8: (32, 42, 0), 9: (8, 58, 0), 10: (0, 64, 0), 11: (0, 60, 0), 12: (0, 50, 60), 13: (0, 0, 0), 14: (0, 0, 0), 15: (0, 0, 0),
                          16: (152, 150, 152), 17: (8, 76, 196), 18: (48, 50, 236), 19: (92, 30, 228), 20: (136, 20, 176), 21: (160, 20, 100), 22: (152, 34, 32), 23: (120, 60, 0), 24: (84, 90, 0), 25: (40, 114, 0), 26: (8, 124, 0), 27: (0, 118, 40), 28: (0, 102, 120), 29: (0, 0, 0), 30: (0, 0, 0), 31: (0, 0, 0),
                          32: (236, 238, 236), 33: (76, 154, 236), 34: (120, 124, 236), 35: (176, 98, 236), 36: (228, 84, 236), 37: (236, 88, 180), 38: (236, 106, 100), 39: (212, 136, 32), 40: (160, 170, 0), 41: (116, 196, 0), 42: (76, 208, 32), 43: (56, 204, 108), 44: (56, 180, 204), 45: (60, 60, 60), 46: (0, 0, 0), 47: (0, 0, 0),
@@ -66,21 +70,25 @@ class ppu:
         self.bg_shifter_attrib_lo = 0
         self.bg_shifter_attrib_hi = 0
         self.nmi = False
-        self.oam = [0] * 256
+        self.oamblock = bytearray(256)
+        self.oam = memoryview(self.oamblock)
         self.oam_addr = 0
-        self.spriteScanline = [0] * 32
+        self.spriteScanlineblock = bytearray(32)
+        self.spriteScanline = memoryview(self.spriteScanlineblock)
         self.sprite_count = 0
-        self.sprite_shifter_pattern_lo = [0] * 8
-        self.sprite_shifter_pattern_hi = [0] * 8
+        self.sprite_shifter_pattern_loblock = bytearray(8)
+        self.sprite_shifter_pattern_hiblock = bytearray(8)
+        self.sprite_shifter_pattern_lo = memoryview(self.sprite_shifter_pattern_loblock)
+        self.sprite_shifter_pattern_hi = memoryview(self.sprite_shifter_pattern_hiblock)
         self.spriteZeroHitPossible = False
         self.spriteZeroBeingRendered = False
         self.odd_frame = False
         pygame.init()
-        #TODO: add scaling support
         self.scaling_factor = 2
         self.screen_width, self.screen_height = 256, 240
         self.window = pygame.display.set_mode((self.screen_width*self.scaling_factor, self.screen_height*self.scaling_factor))
-        self.screenarray = [0] * 256*240*3
+        self.screenarrayblock = bytearray(256*240*3)
+        self.screenarray = memoryview(self.screenarrayblock)
 
     def getColorFromPaletteRam(self, addr):
         self.addr = addr & 0x1F
@@ -570,8 +578,7 @@ class ppu:
                 if self.pressedKey[pygame.K_RIGHT]:
                     self.controller[0] |= 0x01
                 if self.pressedKey[pygame.K_r]:
-                    self.reset()
+                    self.bus.reset()
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.running = False
-
